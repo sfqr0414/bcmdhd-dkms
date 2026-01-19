@@ -79,4 +79,5 @@ jobs:
             ## Changelog for ${{ env.version }}
             ${{ env.changes }}
           append_body: true
-
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: false
