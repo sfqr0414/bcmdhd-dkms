@@ -375,6 +375,11 @@ extern int dhd_debug_dump_to_ring(dhd_pub_t *dhdp);
 #endif /* DHD_DEBUGABILITY_DEBUG_DUMP */
 
 extern char *dhd_log_dump_get_timestamp(void);
+
+/* File helpers */
+extern int write_dump_to_file(dhd_pub_t *dhd, uint8 *buf, int size, char *fname);
+extern int write_file(const char * file_name, uint32 flags, uint8 *buf, int size);
+
 extern void dhd_dbg_ring_write(int type, char *binary_data,
 	int binary_len, const char *fmt, ...);
 

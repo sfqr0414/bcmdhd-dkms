@@ -164,6 +164,8 @@ typedef struct _dhd_ds_trace_t {
 	((buscorerev == 66) || (buscorerev == 67))
 
 struct dhd_bus;
+typedef struct dhd_bus dhd_bus_t;
+typedef struct dhdpcie_info dhdpcie_info_t;
 
 struct dhd_pcie_rev {
 	uint8	fw_rev;
@@ -237,6 +239,32 @@ typedef enum dhd_pcie_link_state {
 	DHD_PCIE_COMMON_BP_DOWN = 2,
 	DHD_PCIE_WLAN_BP_DOWN = 3
 } dhd_pcie_link_state_type_t;
+
+#ifdef BCMPCIE
+/* PCIE helper prototypes moved to canonical header */
+extern uint32 dhdpcie_bus_intstatus(dhd_bus_t *bus);
+extern void dhdpcie_bus_mpu_disable(dhd_bus_t *bus);
+extern bool dhdpcie_chip_support_msi(dhd_bus_t *bus);
+extern int dhdpcie_detach(dhdpcie_info_t *pch);
+/* Power-request Reload WAR helpers */
+extern void dhd_bus_pcie_pwr_req_reload_war(struct dhd_bus *bus);
+extern void dhd_bus_pcie_pwr_req_clear_reload_war(struct dhd_bus *bus);
+extern int dhpcie_bus_unmask_interrupt(dhd_bus_t *bus);
+extern void dhdpcie_disable_msi(struct pci_dev *pdev);
+extern int dhd_pcie_dma_info_dump(dhd_pub_t *dhd);
+extern int dhd_pcie_dump_wrapper_regs(dhd_pub_t *dhd);
+extern int dhdpcie_enable_msi(struct pci_dev *pdev, unsigned int min_vecs, unsigned int max_vecs);
+extern uint8 dhdpcie_find_pci_capability(osl_t *osh, uint8 req_cap_id);
+extern dhd_pcie_link_state_type_t dhdpcie_get_link_state(dhd_bus_t *bus);
+extern int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info);
+extern void dhdpcie_mem_dump_bugcheck(dhd_bus_t *bus, uint8 *buf);
+extern int dhdpcie_request_irq(dhdpcie_info_t *dhdpcie_info);
+extern int dhdpcie_scan_resource(dhdpcie_info_t *dhdpcie_info);
+extern void dhdpcie_update_ring_ptrs_in_tcm(dhd_bus_t *bus, void *data, uint8 type, uint16 ringid,
+	bool read);
+extern void dhdpcie_update_ring_ptrs_in_tcm_with_req_pwr(dhd_bus_t *bus, void *data, uint8 type,
+	uint16 ringid, bool read, bool req_pwr);
+#endif /* BCMPCIE */
 
 /* Max length of filename in IOVAR or in module parameter */
 #define DHD_MAX_PATH	2048u
@@ -707,6 +735,9 @@ extern uint32 dhdpcie_bus_cfg_read_dword(struct dhd_bus *bus, uint32 addr, uint3
 extern void dhdpcie_bus_cfg_write_dword(struct dhd_bus *bus, uint32 addr, uint32 size, uint32 data);
 extern void dhdpcie_bus_intr_enable(struct dhd_bus *bus);
 extern void dhdpcie_bus_intr_disable(struct dhd_bus *bus);
+
+/* Provide prototype for bcmstrbuf capability helper (matches BCMRAMFN defn) */
+extern void dhd_cap_bcmstrbuf(dhd_pub_t *dhd, struct bcmstrbuf *b);
 extern int dhpcie_bus_mask_interrupt(dhd_bus_t *bus);
 extern void dhdpcie_bus_release(struct dhd_bus *bus);
 extern int32 dhdpcie_bus_isr(struct dhd_bus *bus);
@@ -774,6 +805,8 @@ void dhdpcie_os_wtcm64(dhd_bus_t *bus, ulong offset, uint64 data);
 uint64 dhdpcie_os_rtcm64(dhd_bus_t *bus, ulong offset);
 #endif
 extern void dhd_dpc_kill(dhd_pub_t *dhdp);
+extern void dhd_dpc_enable(dhd_pub_t *dhdp);
+extern void dhd_dpc_tasklet_kill(dhd_pub_t *dhdp);
 #endif /* LINUX || linux */
 
 #if defined(linux) || defined(LINUX)
@@ -845,6 +878,8 @@ extern void dhd_dump_bus_mmio_trace(dhd_bus_t *bus, struct bcmstrbuf *strbuf);
 extern void dhd_dump_bus_ds_trace(dhd_bus_t *bus, struct bcmstrbuf *strbuf);
 extern bool dhdpcie_bus_get_pcie_hostready_supported(dhd_bus_t *bus);
 extern void dhd_bus_hostready(struct  dhd_bus *bus);
+/* Validate PCIE link helper used by pcie and msgbuf callers */
+extern void dhd_validate_pcie_link_cbp_wlbp(dhd_bus_t *bus);
 #ifdef PCIE_OOB
 extern bool dhdpcie_bus_get_pcie_oob_dw_supported(dhd_bus_t *bus);
 #endif /* PCIE_OOB */

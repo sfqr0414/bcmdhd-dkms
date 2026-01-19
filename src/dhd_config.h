@@ -114,6 +114,65 @@ typedef struct mchan_params {
 	int miracast_mode;
 } mchan_params_t;
 
+/* Public prototypes for configuration helpers (added to satisfy -Wmissing-prototypes) */
+/* Forward declare event buffer struct used by config helpers */
+struct eventmsg_buf;
+
+/* Forward-declare chip/module mapping structs (defined in dhd_config.c) */
+struct chip_name_map_t;
+struct chip_name_map_v2_t;
+struct module_name_map_v2_t;
+struct module_name_map_t;
+
+void dhd_conf_free_chip_nv_path_list(wl_chip_nv_path_list_ctrl_t *chip_nv_list);
+void dhd_conf_free_country_list(struct dhd_conf *conf);
+void dhd_conf_free_mchan_list(struct dhd_conf *conf);
+const struct chip_name_map_t *dhd_conf_match_chip(dhd_pub_t *dhd, uint ag_type);
+const struct chip_name_map_v2_t *dhd_conf_match_chip_v2(dhd_pub_t *dhd);
+const struct module_name_map_v2_t *dhd_conf_match_module_v2(dhd_pub_t *dhd);
+#ifdef UPDATE_MODULE_NAME
+const struct module_name_map_t *dhd_conf_match_module(dhd_pub_t *dhd);
+#endif
+char *dhd_conf_get_chip_name(dhd_pub_t *dhd, int ag_type, bool *chip_map_v2);
+char *dhd_conf_get_module_name(dhd_pub_t *dhd, int ag_type);
+int dhd_conf_set_fw_name_by_chip(dhd_pub_t *dhd, char *fw_path);
+void dhd_conf_set_clm_name_by_chip(dhd_pub_t *dhd, char *clm_path, int ag_type);
+void dhd_conf_set_nv_name_by_chip(dhd_pub_t *dhd, char *nv_path, int ag_type);
+void dhd_conf_copy_path(dhd_pub_t *dhd, char *dst_name, char *dst_path, char *src_path);
+void dhd_conf_set_conf_name_by_chip(dhd_pub_t *dhd, char *conf_path);
+void dhd_conf_set_tput_patch(dhd_pub_t *dhd);
+void dhd_conf_dump_tput_patch(dhd_pub_t *dhd);
+int dhd_conf_map_country_list(dhd_pub_t *dhd, wl_country_t *cspec);
+int dhd_conf_fix_country(dhd_pub_t *dhd);
+int dhd_conf_scan_mac(dhd_pub_t * dhd, char *cmd, char *buf);
+int dhd_conf_autocountry(dhd_pub_t *dhd, char *cmd, char *buf);
+int dhd_conf_set_roam(dhd_pub_t *dhd, int ifidx);
+void dhd_conf_add_to_eventbuffer(struct eventmsg_buf *ev, u16 event, bool set);
+s32 dhd_conf_apply_eventbuffer(dhd_pub_t *dhd, struct eventmsg_buf *ev);
+void dhd_conf_set_bw_cap(dhd_pub_t *dhd);
+void dhd_conf_get_wme(dhd_pub_t *dhd, int ifidx, int mode, edcf_acparam_t *acp);
+void dhd_conf_update_wme(dhd_pub_t *dhd, int ifidx, int mode, edcf_acparam_t *acp, int param);
+uint pick_config_vars(char *varbuf, uint len, uint start_pos, char *pickbuf, int picklen);
+bool dhd_conf_read_chiprev(dhd_pub_t *dhd, int *chip_match, char *full_param, uint len_param);
+bool dhd_conf_read_log_level(dhd_pub_t *dhd, char *full_param, uint len_param);
+void dhd_conf_read_wme_ac_value(wme_param_t *wme, char *pick, int ac_val);
+bool dhd_conf_read_wme_ac_params(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_nv_by_chip(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_roam_params(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_country(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_mchan_params(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_pkt_filter(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_pm_params(dhd_pub_t *dhd, char *full_param, uint len_param);
+/* SDIO/PCIE-specific config readers (moved from dhd_protos.h) */
+bool dhd_conf_read_sdio_params(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_pcie_params(dhd_pub_t *dhd, char *full_param, uint len_param);
+bool dhd_conf_read_others(dhd_pub_t *dhd, char *full_param, uint len_param);
+
+/* Additional configuration helper prototypes */
+void dhd_conf_set_devid(dhd_pub_t *dhd);
+int dhd_conf_compat_func(dhd_pub_t *dhd);
+void dhd_conf_free_preinit(dhd_pub_t *dhd);
+
 #ifdef SCAN_SUPPRESS
 enum scan_intput_flags {
 	NO_SCAN_INTPUT	= (1 << (0)),

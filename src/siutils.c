@@ -91,6 +91,15 @@
 #include <hnd_gcishm.h>
 #endif
 #include "siutils_priv.h"
+
+/* Prototypes to satisfy -Wmissing-prototypes */
+uint32 si_clear_backplane_to(si_t *sih);
+
+#if defined(AXI_TIMEOUTS) || defined(AXI_TIMEOUTS_NIC)
+uint32 si_clear_backplane_to_per_core(si_t *sih, uint coreid, uint coreunit, void *wrap);
+#endif /* AXI_TIMEOUTS || AXI_TIMEOUTS_NIC */
+
+void si_slave_wrapper_add(si_t *sih);
 #include "sbhndarm.h"
 #include <hndchipc.h>
 

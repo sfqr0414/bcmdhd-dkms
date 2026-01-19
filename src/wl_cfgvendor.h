@@ -29,6 +29,9 @@
 #ifndef _wl_cfgvendor_h_
 #define _wl_cfgvendor_h_
 
+/* Forward-declare cfg state struct to avoid parameter visibility warnings */
+struct bcm_cfg80211;
+
 #define OUI_BRCM    0x001018
 #define OUI_GOOGLE  0x001A11
 #define BRCM_VENDOR_SUBCMD_PRIV_STR	1
@@ -196,6 +199,13 @@ typedef enum {
 	/* This is reserved for future usage */
 
 } ANDROID_VENDOR_SUB_COMMAND;
+
+/* Added prototypes to satisfy -Wmissing-prototypes */
+extern char *wl_get_kernel_timestamp(void);
+extern struct net_device *wl_cfgvendor_get_ndev(struct bcm_cfg80211 *cfg, struct wireless_dev *wdev,
+	const char *data, unsigned long int *out_addr);
+extern int wl_cfgvendor_set_tx_power_policy_handler(struct wiphy *wiphy,
+	struct wireless_dev *wdev, const void *data, int len);
 
 enum andr_vendor_subcmd {
 	GSCAN_SUBCMD_GET_CAPABILITIES = ANDROID_NL80211_SUBCMD_GSCAN_RANGE_START,

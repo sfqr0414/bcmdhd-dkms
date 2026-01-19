@@ -29,6 +29,11 @@
 #include <bcmutils.h>
 #include <dhd_dbg_ring.h>
 
+/* Small debug helper prototypes added to reduce -Wmissing-prototypes during port */
+extern int replace_percent_p_to_x(char *fmt);
+extern bool check_valid_string_format(char *curr_ptr);
+extern bool check_valid_non_string_format(char *curr_ptr);
+
 enum {
 	/* Feature set */
 	DBG_MEMORY_DUMP_SUPPORTED = (1 << (0)), /* Memory dump of FW */
@@ -839,6 +844,9 @@ extern void *dhd_dbg_get_priv(dhd_pub_t *dhdp);
 extern int dhd_dbg_send_urgent_evt(dhd_pub_t *dhdp, const void *data, const uint32 len);
 extern void dhd_dbg_verboselog_printf(dhd_pub_t *dhdp, prcd_event_log_hdr_t *plog_hdr,
 	void *raw_event_ptr, uint32 *log_ptr, uint32 logset, uint16 block);
+
+/* Parse and process event log header; returns true on success */
+extern bool dhd_dbg_process_event_log_hdr(event_log_hdr_t *log_hdr, prcd_event_log_hdr_t *prcd_log_hdr);
 int dhd_dbg_pull_from_ring(dhd_pub_t *dhdp, int ring_id, void *data, uint32 buf_len,
 	int *num_entries);
 int dhd_dbg_pull_single_from_ring(dhd_pub_t *dhdp, int ring_id, void *data, uint32 buf_len,

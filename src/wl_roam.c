@@ -29,10 +29,14 @@
 #ifdef WL_CFG80211
 #include <wl_cfg80211.h>
 #endif
+#include <wl_cfgscan.h> /* bring in roam helper prototypes */
 #include <wldev_common.h>
 #if defined(__linux__)
 #include <bcmstdlib_s.h>
 #endif /* defined(__linux__) */
+
+/* Strict prototype checking enabled for this compilation unit */
+
 
 #ifdef ESCAN_CHANNEL_CACHE
 #define MAX_ROAM_CACHE		200

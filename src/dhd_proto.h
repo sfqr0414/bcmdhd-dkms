@@ -35,6 +35,307 @@
 #include <dhd_flowring.h>
 #endif
 
+/* Bring in types used by protocol structure */
+#include <dhd.h>
+#include <bcmmsgbuf.h>
+#include <dhd_bus.h>
+#include <dhd_flowring.h>
+#include <bcmcdc.h>
+
+/* Ring name length used by msgbuf_ring_t */
+#ifndef RING_NAME_MAX_LENGTH
+#define RING_NAME_MAX_LENGTH	24
+#endif
+
+/* Fallback SDIO alignment and margins (if not defined elsewhere) */
+#ifndef DHD_SDALIGN
+#define DHD_SDALIGN 32
+#endif
+#ifndef BUS_HEADER_LEN
+#define BUS_HEADER_LEN (24 + DHD_SDALIGN)
+#endif
+#ifndef ROUND_UP_MARGIN
+#define ROUND_UP_MARGIN 2048
+#endif
+
+
+/* DHD DMA loopback structure */
+typedef struct dhd_dmaxfer {
+	dhd_dma_buf_t srcmem;
+	dhd_dma_buf_t dstmem;
+	uint32        srcdelay;
+	uint32        destdelay;
+	uint32        len;
+	bool          in_progress;
+	uint64        start_usec;
+	uint64        time_taken;
+	uint32        d11_lpbk;
+	int           status;
+} dhd_dmaxfer_t;
+
+
+
+/* msgbuf_ring : This object manages the host side ring that includes a DMA-able
+ * buffer, the WR and RD indices, ring parameters such as max number of items
+ * an length of each items, and other miscellaneous runtime state.
+ * A msgbuf_ring may be used to represent a H2D or D2H common ring or a
+ * H2D TxPost ring as specified in the PCIE FullDongle Spec.
+ * Ring parameters are conveyed to the dongle, which maintains its own peer end
+ * ring state. Depending on whether the DMA Indices feature is supported, the
+ * host will update the WR/RD index in the DMA indices array in host memory or
+ * directly in dongle memory.
+ */
+typedef struct msgbuf_ring {
+	bool           inited;
+	uint16         idx;       /* ring id */
+	uint16         rd;        /* read index */
+	uint16         curr_rd;   /* read index for debug */
+	uint16         wr;        /* write index */
+	uint16         max_items; /* maximum number of items in ring */
+	uint16         item_len;  /* length of each item in the ring */
+	sh_addr_t      base_addr; /* LITTLE ENDIAN formatted: base address */
+	dhd_dma_buf_t  dma_buf;   /* DMA-able buffer: pa, va, len, dmah, secdma */
+	uint32         seqnum;    /* next expected item's sequence number */
+/* Our ring write batching helpers */
+	void           *start_addr;
+	/* # of messages on ring not yet announced to dongle */
+	uint16         pend_items_count;
+#ifdef AGG_H2D_DB
+	osl_atomic_t	inflight;
+#endif /* AGG_H2D_DB */
+
+	uint8           ring_type;
+	uint8           n_completion_ids;
+	bool            create_pending;
+	uint16          create_req_id;
+	uint8           current_phase;
+	uint16	        compeltion_ring_ids[MAX_COMPLETION_RING_IDS_ASSOCIATED];
+	uchar		name[RING_NAME_MAX_LENGTH];
+	uint32		ring_mem_allocated;
+	void	        *ring_lock;
+	struct msgbuf_ring *linked_ring; /* Ring Associated to metadata ring */
+} msgbuf_ring_t;
+
+/* Callback used to sync on D2H DMA completion (seqnum or xorcsum) */
+typedef uint8 (* d2h_sync_cb_t)(dhd_pub_t *dhd, msgbuf_ring_t *ring,
+	volatile cmn_msg_hdr_t *cmn_hdr, int item_len);
+
+/* DHD protocol handle. Is an opaque type to other DHD software layers. */
+typedef struct dhd_prot {
+	osl_t *osh;		/* OSL handle */
+	/* CDC/BDC protocol fields */
+	uint16 reqid;
+	uint8 pending;
+	uint32 lastcmd;
+	uint8 bus_header[BUS_HEADER_LEN];
+	cdc_ioctl_t msg;
+	unsigned char buf[WLC_IOCTL_MAXLEN + ROUND_UP_MARGIN];
+	uint16 rxbufpost_sz; 		/* Size of rx buffer posted to dongle */
+	uint16 rxbufpost_alloc_sz; 	/* Actual rx buffer packet allocated in the host */
+	uint16 rxbufpost;
+	uint16 rx_buf_burst;
+	uint16 rx_bufpost_threshold;
+	uint16 max_rxbufpost;
+	uint32 tot_rxbufpost;
+	uint32 tot_rxcpl;
+	uint16 max_eventbufpost;
+	uint16 max_ioctlrespbufpost;
+	uint16 max_tsbufpost;
+	uint16 max_infobufpost;
+	uint16 infobufpost;
+	uint16 cur_event_bufs_posted;
+	uint16 cur_ioctlresp_bufs_posted;
+	uint16 cur_ts_bufs_posted;
+
+	/* Flow control mechanism based on active transmits pending */
+	osl_atomic_t active_tx_count; /* increments/decrements on every packet tx/tx_status */
+	uint16 h2d_max_txpost;
+	uint16 h2d_htput_max_txpost;
+	uint16 txp_threshold;  /* optimization to write "n" tx items at a time to ring */
+
+	/* MsgBuf Ring info: has a dhd_dma_buf that is dynamically allocated */
+	msgbuf_ring_t h2dring_ctrl_subn; /* H2D ctrl message submission ring */
+	msgbuf_ring_t h2dring_rxp_subn; /* H2D RxBuf post ring */
+	msgbuf_ring_t d2hring_ctrl_cpln; /* D2H ctrl completion ring */
+	msgbuf_ring_t d2hring_tx_cpln; /* D2H Tx complete message ring */
+	msgbuf_ring_t d2hring_rx_cpln; /* D2H Rx complete message ring */
+	msgbuf_ring_t *h2dring_info_subn; /* H2D info submission ring */
+	msgbuf_ring_t *d2hring_info_cpln; /* D2H info completion ring */
+	msgbuf_ring_t *d2hring_edl; /* D2H Enhanced Debug Lane (EDL) ring */
+
+	msgbuf_ring_t *h2d_flowrings_pool; /* Pool of preallocated flowings */
+	dhd_dma_buf_t flowrings_dma_buf; /* Contiguous DMA buffer for flowrings */
+	uint16        h2d_rings_total; /* total H2D (common rings + flowrings) */
+
+	uint32		rx_dataoffset;
+
+#ifdef BCMPCIE
+	/* Mailbox/doorbell hooks (PCIE only) */
+	dhd_mb_ring_t	mb_ring_fn;	/* called when dongle needs to be notified of new msg */
+	dhd_mb_ring_2_t	mb_2_ring_fn;	/* called when dongle needs to be notified of new msg */
+#endif /* BCMPCIE */
+
+	/* ioctl related resources */
+	uint8 ioctl_state;
+	int16 ioctl_status; 		/* status returned from dongle */
+	uint16 ioctl_resplen;
+	dhd_ioctl_recieved_status_t ioctl_received;
+	uint curr_ioctl_cmd;
+	dhd_dma_buf_t	retbuf; 	/* For holding ioctl response */
+	dhd_dma_buf_t	ioctbuf; 	/* For holding ioctl request */
+
+	dhd_dma_buf_t	d2h_dma_scratch_buf; 	/* For holding d2h scratch */
+
+	/* DMA-able arrays for holding WR and RD indices */
+	uint32          rw_index_sz; /* Size of a RD or WR index in dongle */
+	dhd_dma_buf_t   h2d_dma_indx_wr_buf; 	/* Array of H2D WR indices */
+	dhd_dma_buf_t	h2d_dma_indx_rd_buf; 	/* Array of H2D RD indices */
+	dhd_dma_buf_t	d2h_dma_indx_wr_buf; 	/* Array of D2H WR indices */
+	dhd_dma_buf_t	d2h_dma_indx_rd_buf; 	/* Array of D2H RD indices */
+	dhd_dma_buf_t h2d_ifrm_indx_wr_buf; 	/* Array of H2D WR indices for ifrm */
+
+	dhd_dma_buf_t	host_bus_throughput_buf; /* bus throughput measure buffer */
+
+	dhd_dma_buf_t   *flowring_buf;    /* pool of flow ring buf */
+#ifdef DHD_DMA_INDICES_SEQNUM
+	char *h2d_dma_indx_rd_copy_buf; /* Local copy of H2D WR indices array */
+	char *d2h_dma_indx_wr_copy_buf; /* Local copy of D2H WR indices array */
+	uint32 h2d_dma_indx_rd_copy_bufsz; /* H2D WR indices array size */
+	uint32 d2h_dma_indx_wr_copy_bufsz; /* D2H WR indices array size */
+	uint32 host_seqnum; 	/* Seqence number for D2H DMA Indices sync */
+#endif /* DHD_DMA_INDICES_SEQNUM */
+	uint32			flowring_num;
+
+	d2h_sync_cb_t d2h_sync_cb; /* Sync on D2H DMA done: SEQNUM or XORCSUM */
+#ifdef EWP_EDL
+	d2h_edl_sync_cb_t d2h_edl_sync_cb; /* Sync on EDL D2H DMA done: SEQNUM or XORCSUM */
+#endif /* EWP_EDL */
+	ulong d2h_sync_wait_max; /* max number of wait loops to receive one msg */
+	ulong d2h_sync_wait_tot; /* total wait loops */
+
+	dhd_dmaxfer_t	dmaxfer; /* for test/DMA loopback */
+
+	uint16		ioctl_seq_no;
+	uint16		data_seq_no;  /* XXX this field is obsolete */
+	uint16		ioctl_trans_id;
+	void		*pktid_ctrl_map; /* a pktid maps to a packet and its metadata */
+	void		*pktid_rx_map; 	/* pktid map for rx path */
+	void		*pktid_tx_map; 	/* pktid map for tx path */
+	bool		metadata_dbg;
+	void		*pktid_map_handle_ioctl;
+#ifdef DHD_MAP_PKTID_LOGGING
+	void		*pktid_dma_map; 	/* pktid map for DMA MAP */
+	void		*pktid_dma_unmap; /* pktid map for DMA UNMAP */
+#endif /* DHD_MAP_PKTID_LOGGING */
+	uint32		pktid_depleted_cnt; 	/* pktid depleted count */
+	/* netif tx queue stop count */
+	uint8		pktid_txq_stop_cnt;
+	/* netif tx queue start count */
+	uint8		pktid_txq_start_cnt;
+	uint64		ioctl_fillup_time; 	/* timestamp for ioctl fillup */
+	uint64		ioctl_ack_time; 		/* timestamp for ioctl ack */
+	uint64		ioctl_cmplt_time; 	/* timestamp for ioctl completion */
+
+	/* Applications/utilities can read tx and rx metadata using IOVARs */
+	uint16		rx_metadata_offset;
+	uint16		tx_metadata_offset;
+
+#if (defined(BCM_ROUTER_DHD) && defined(HNDCTF))
+	rxchain_info_t	rxchain; 	/* chain of rx packets */
+#endif
+
+#if defined(DHD_D2H_SOFT_DOORBELL_SUPPORT)
+	/* Host's soft doorbell configuration */
+	bcmpcie_soft_doorbell_t soft_doorbell[BCMPCIE_D2H_COMMON_MSGRINGS];
+#endif /* DHD_D2H_SOFT_DOORBELL_SUPPORT */
+
+	/* Work Queues to be used by the producer and the consumer, and threshold
+	 * when the WRITE index must be synced to consumer's workq
+	 */
+	dhd_dma_buf_t	fw_trap_buf; /* firmware trap buffer */
+#ifdef FLOW_RING_PREALLOC
+	/* pre-allocation htput ring buffer */
+	dhd_dma_buf_t	htput_ring_buf[HTPUT_TOTAL_FLOW_RINGS];
+	/* pre-allocation folw ring(non htput rings) */
+	dhd_dma_buf_t	flow_ring_buf[MAX_FLOW_RINGS];
+#endif /* FLOW_RING_PREALLOC */
+	uint32  host_ipc_version; /* Host sypported IPC rev */
+	uint32  device_ipc_version; /* FW supported IPC rev */
+	uint32  active_ipc_version; /* Host advertised IPC rev */
+	dhd_dma_buf_t   hostts_req_buf; /* For holding host timestamp request buf */
+	bool    hostts_req_buf_inuse;
+	bool    rx_ts_log_enabled;
+	bool    tx_ts_log_enabled;
+
+#ifdef DHD_HMAPTEST
+	uint32 hmaptest_rx_active;
+	uint32 hmaptest_rx_pktid;
+	char *hmap_rx_buf_va;
+	dmaaddr_t hmap_rx_buf_pa;
+	uint32 hmap_rx_buf_len;
+
+	uint32 hmaptest_tx_active;
+	uint32 hmaptest_tx_pktid;
+	char *hmap_tx_buf_va;
+	dmaaddr_t hmap_tx_buf_pa;
+	uint32	  hmap_tx_buf_len;
+	dhd_hmaptest_t	hmaptest; /* for hmaptest */
+	bool hmap_enabled; /* TRUE = hmap is enabled */
+#endif /* DHD_HMAPTEST */
+	bool no_retry;
+	bool no_aggr;
+	bool fixed_rate;
+	dhd_dma_buf_t	host_scb_buf; /* scb host offload buffer */
+	bool no_tx_resource;
+	uint32 txcpl_db_cnt;
+#ifdef AGG_H2D_DB
+	agg_h2d_db_info_t agg_h2d_db_info;
+#endif /* AGG_H2D_DB */
+	uint64 tx_h2d_db_cnt;
+uint8 ctrl_cpl_snapshot[D2HRING_CTRL_CMPLT_ITEMSIZE];
+	uint32 event_wakeup_pkt; /* Number of event wakeup packet rcvd */
+	uint32 rx_wakeup_pkt;    /* Number of Rx wakeup packet rcvd */
+	uint32 info_wakeup_pkt;  /* Number of info cpl wakeup packet rcvd */
+	msgbuf_ring_t *d2hring_md_cpl; /* D2H metadata completion ring */
+	/* no. which controls how many rx cpl/post items are processed per dpc */
+	uint32 rx_cpl_post_bound;
+	/*
+	 * no. which controls how many tx post items are processed per dpc,
+	 * i.e, how many tx pkts are posted to flowring from the bkp queue
+	 * from dpc context
+	 */
+	uint32 tx_post_bound;
+	/* no. which controls how many tx cpl items are processed per dpc */
+	uint32 tx_cpl_bound;
+	/* no. which controls how many ctrl cpl/post items are processed per dpc */
+	uint32 ctrl_cpl_post_bound;
+} dhd_prot_t;
+
+/* Canonical protocol prototypes moved here to reduce -Wmissing-prototypes warnings
+ * and serve as the single authoritative declarations during the port.
+ */
+extern void dhd_set_host_cap(dhd_pub_t *dhd);
+extern void dhd_prot_clearcounts(dhd_pub_t *dhd);
+extern void dhd_prot_update_rings_size(dhd_prot_t *prot);
+extern int dhd_prepare_schedule_dmaxfer_free(dhd_pub_t *dhdp);
+extern void dhd_prot_clean_flow_ring(dhd_pub_t *dhd, void *msgbuf_flow_info);
+extern void dhd_msgbuf_delay_post_ts_bufs(dhd_pub_t *dhd);
+
+/* RX emerge helpers (canonicalized) */
+extern void dhd_rx_emerge_enqueue(dhd_pub_t *dhdp, void *pkt);
+extern void *dhd_rx_emerge_dequeue(dhd_pub_t *dhdp);
+
+/* SDIO / bus helper prototypes (canonicalized) */
+extern bool dhdsdio_is_dataok(struct dhd_bus *bus);
+extern uint8 dhdsdio_get_databufcnt(struct dhd_bus *bus);
+/* Canonical SDIO helpers */
+extern void dhdsdio_isr(void *arg);
+extern int dhdsdio_downloadvars(struct dhd_bus *bus, void *arg, int len);
+extern uint8 dhdsdio_devcap_get(struct dhd_bus *bus);
+extern int dhd_sr_config(dhd_pub_t *dhd, bool on);
+extern void dhd_enable_oob_intr(struct dhd_bus *bus, bool enable);
+extern void dhd_bus_check_srmemsize(dhd_pub_t *dhdp);
+
 #define DEFAULT_IOCTL_RESP_TIMEOUT	(5 * 1000) /* 5 seconds */
 #ifndef IOCTL_RESP_TIMEOUT
 #if defined(BCMQT_HW)

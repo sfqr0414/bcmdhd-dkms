@@ -95,6 +95,8 @@ extern int wl_cfg80211_set_mgmt_vndr_ies(struct bcm_cfg80211 *cfg,
 
 extern s32 wl_cfg80211_dfs_ap_move(struct net_device *ndev, char *data,
 		char *command, int total_len);
+
+/* WPS IE validation helper is internal; no public prototype required */
 extern s32 wl_cfg80211_get_band_chanspecs(struct net_device *ndev,
 		void *buf, s32 buflen, chanspec_band_t band, bool acs_req);
 
@@ -192,6 +194,31 @@ extern s32 wl_cfg80211_change_virtual_iface(struct wiphy *wiphy, struct net_devi
 	u32 *flags,
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) */
 	struct vif_params *params);
+
+/* Added public prototypes to satisfy -Wmissing-prototypes */
+struct wireless_dev *wl_cfg80211_p2p_if_add(struct bcm_cfg80211 *cfg,
+	wl_iftype_t wl_iftype,
+	char const *name, u8 *mac_addr, s32 *ret_err);
+
+s32 wl_get_connected_bssid(struct bcm_cfg80211 *cfg, struct net_device *ndev, u8 *mac_addr);
+
+void wl_handle_unexpected_assoc_states(struct bcm_cfg80211 *cfg,
+	struct wireless_dev *wdev, const wl_event_msg_t *e,
+	void *data, wl_assoc_state_t assoc_state);
+
+/* Additional prototypes to satisfy -Wmissing-prototypes */
+
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)) || defined(WL_COMPAT_WIRELESS)
+extern s32 wl_cfg80211_parse_ap_ies(struct net_device *dev,
+	struct cfg80211_beacon_data *info,
+	struct parsed_ies *ies);
+extern s32 wl_cfg80211_set_ies(struct net_device *dev,
+	struct cfg80211_beacon_data *info,
+	s32 bssidx);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) */
+extern void wl_cfg80211_ch_switch_notify(struct net_device *dev, uint16 chanspec, struct wiphy *wiphy);
+
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)) || \
 	defined(WL_COMPAT_WIRELESS)

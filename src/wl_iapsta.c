@@ -6,6 +6,9 @@
 #include <wlioctl_utils.h>
 #include <wl_android.h>
 #include <dhd_config.h>
+
+/* Strict prototype checking enabled for this compilation unit */
+
 #ifdef WL_CFG80211
 #include <wl_cfg80211.h>
 #include <wl_cfgscan.h>
@@ -2271,8 +2274,7 @@ wl_ext_sta_connecting(struct net_device *dev)
 	return connecting;
 }
 
-bool
-wl_ext_sta_handshaking(struct net_device *dev)
+static __maybe_unused bool wl_ext_sta_handshaking(struct net_device *dev)
 {
 	struct wl_if_info *cur_if = NULL;
 	bool connecting = FALSE;
@@ -3077,8 +3079,7 @@ wl_ext_add_sta_info(struct net_device *net, u8 *bssid)
 #endif /* WL_CFG80211 */
 
 #ifndef WL_STATIC_IF
-s32
-wl_ext_add_del_bss(struct net_device *ndev, s32 bsscfg_idx,
+static s32 wl_ext_add_del_bss(struct net_device *ndev, s32 bsscfg_idx,
 	int iftype, s32 del, u8 *addr)
 {
 	s32 ret = BCME_OK;
@@ -3838,8 +3839,7 @@ wl_iapsta_wait_event_complete(struct dhd_pub *dhd)
 	}
 }
 
-int
-wl_iapsta_suspend_resume_ap(dhd_pub_t *dhd, struct wl_if_info *cur_if,
+static int wl_iapsta_suspend_resume_ap(dhd_pub_t *dhd, struct wl_if_info *cur_if,
 	int suspend)
 {
 	struct wl_apsta_params *apsta_params = dhd->iapsta_params;
@@ -5445,8 +5445,7 @@ done:
 }
 #endif /* RXF0OVFL_REINIT_WAR */
 
-void
-wl_ext_iapsta_link(struct wl_if_info *cur_if,
+static void wl_ext_iapsta_link(struct wl_if_info *cur_if,
 	const wl_event_msg_t *e, void *data)
 {
 	struct dhd_pub *dhd = dhd_get_pub(cur_if->dev);
@@ -5574,8 +5573,7 @@ wl_ext_iapsta_ccode(struct wl_if_info *cur_if,
 	}
 }
 
-void
-wl_ext_iapsta_event(struct net_device *dev, void *argu,
+static void wl_ext_iapsta_event(struct net_device *dev, void *argu,
 	const wl_event_msg_t *e, void *data)
 {
 #ifdef ACS_MONITOR
@@ -6314,8 +6312,7 @@ exit:
 	return ret;
 }
 
-int
-wl_ext_isam_dev_status(struct net_device *dev, ifmode_t ifmode, char prefix,
+static int wl_ext_isam_dev_status(struct net_device *dev, ifmode_t ifmode, char prefix,
 	char *dump_buf, int dump_len)
 {
 	struct wl_chan_info chan_info;

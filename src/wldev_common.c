@@ -36,6 +36,7 @@
 #define WL_DBG_PRINT_SYSTEM_TIME
 #endif /* WL_CFG80211 */
 #include <dhd_config.h>
+#include <dhd_linux.h>
 
 #if defined(IL_BIGENDIAN)
 #include <bcmendian.h>
@@ -75,7 +76,7 @@
 	} while (0)
 #define WLDEV_INFO(x) WLDEV_INFO_MSG x
 
-extern int dhd_ioctl_entry_local(struct net_device *net, wl_ioctl_t *ioc, int cmd);
+/* dhd_ioctl_entry_local: canonical prototype declared in src/dhd_linux.h */
 
 s32 wldev_ioctl(
 	struct net_device *dev, u32 cmd, void *arg, u32 len, u32 set)

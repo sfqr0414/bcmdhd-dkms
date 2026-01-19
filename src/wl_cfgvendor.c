@@ -30,6 +30,9 @@
 #include <linuxver.h>
 #include <osl.h>
 #include <linux/kernel.h>
+
+/* Strict prototype checking enabled for this compilation unit */
+
 #include <linux/vmalloc.h>
 
 #include <bcmutils.h>

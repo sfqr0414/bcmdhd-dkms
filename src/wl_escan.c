@@ -7,6 +7,8 @@
 #include <wl_escan.h>
 #include <dhd_config.h>
 
+/* Strict prototype checking enabled for this compilation unit */
+
 #define ESCAN_ERROR(name, arg1, args...) \
 	do { \
 		if (android_msg_level & ANDROID_ERROR_LEVEL) { \
@@ -486,7 +488,7 @@ wl_escan_remove_lowRSSI_info(struct net_device *dev, struct wl_escan_info *escan
 }
 #endif /* ESCAN_BUF_OVERFLOW_MGMT */
 
-void
+static void
 wl_escan_ext_handler(struct net_device *dev, void *argu,
 	const wl_event_msg_t *e, void *data)
 {
@@ -1295,7 +1297,7 @@ exit:
 	return err;
 }
 
-int
+static int
 wl_escan_merge_scan_list(struct net_device *dev, u8 *cur_bssid,
 	struct iw_request_info *info, struct iw_point *dwrq, char *extra,
 	int *len_ret, int *bss_cnt)
@@ -1332,7 +1334,7 @@ exit:
 }
 
 #if defined(BSSCACHE)
-int
+static int
 wl_escan_merge_cache_list(struct net_device *dev, u8 *cur_bssid,
 	struct iw_request_info *info, struct iw_point *dwrq, char *extra,
 	int *len_ret, int *bss_cnt)
@@ -1475,7 +1477,7 @@ exit:
 #endif /* WL_WIRELESS_EXT */
 
 #ifdef WLMESH
-bool
+static bool
 wl_escan_meshid_ie(u8 *parse, u32 len, wlc_ssid_t *mesh_id)
 {
 	bcm_tlv_t *ie;
@@ -1490,7 +1492,7 @@ wl_escan_meshid_ie(u8 *parse, u32 len, wlc_ssid_t *mesh_id)
 	return FALSE;
 }
 
-bool
+static bool
 wl_escan_rsn_ie(u8 *parse, u32 len)
 {
 	if (bcm_parse_tlvs(parse, (u32)len, DOT11_MNG_RSN_ID)) {
@@ -1499,7 +1501,7 @@ wl_escan_rsn_ie(u8 *parse, u32 len)
 	return FALSE;
 }
 
-bool
+static bool
 wl_escan_mesh_info_ie(struct net_device *dev, u8 *parse, u32 len,
 	struct wl_mesh_params *mesh_info)
 {
@@ -1539,7 +1541,7 @@ wl_escan_mesh_info_ie(struct net_device *dev, u8 *parse, u32 len,
 	return found;
 }
 
-bool
+static bool
 wl_escan_mesh_info(struct net_device *dev, struct wl_escan_info *escan,
 	struct ether_addr *peer_bssid, struct wl_mesh_params *mesh_info)
 {
@@ -1610,11 +1612,11 @@ exit:
 	return found;
 }
 
-bool
+static bool
 wl_escan_mesh_peer(struct net_device *dev, struct wl_escan_info *escan,
 	wlc_ssid_t *cur_ssid, uint16 cur_chan, bool sae,
 	struct wl_mesh_params *mesh_info)
-{
+
 	int i = 0;
 	wl_bss_info_v109_t *bi = NULL;
 	wl_scan_results_v109_t *bss_list;

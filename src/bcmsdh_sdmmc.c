@@ -214,7 +214,7 @@ sdioh_sdmmc_card_enablefuncs(sdioh_info_t *sd)
  *     C:  0x20, x0.75
  *     D:  0x30, x0.5
  */
-int
+static int
 sdioh_set_driver_strength(struct sdio_func *func, uint8 level)
 {
 	int reg;
@@ -377,8 +377,7 @@ sdioh_detach(osl_t *osh, sdioh_info_t *sd)
 
 #if defined(OOB_INTR_ONLY) && defined(HW_OOB)
 
-extern SDIOH_API_RC
-sdioh_enable_func_intr(sdioh_info_t *sd)
+static SDIOH_API_RC sdioh_enable_func_intr(sdioh_info_t *sd)
 {
 	uint8 reg;
 	int err;
@@ -412,8 +411,7 @@ sdioh_enable_func_intr(sdioh_info_t *sd)
 	return SDIOH_API_RC_SUCCESS;
 }
 
-extern SDIOH_API_RC
-sdioh_disable_func_intr(sdioh_info_t *sd)
+static SDIOH_API_RC sdioh_disable_func_intr(sdioh_info_t *sd)
 {
 	uint8 reg;
 	int err;
@@ -851,8 +849,9 @@ exit:
  */
 
 SDIOH_API_RC
-sdioh_enable_hw_oob_intr(sdioh_info_t *sd, bool enable)
+sdioh_enable_hw_oob_intr(void *sdioh, bool enable)
 {
+	sdioh_info_t *sd = (sdioh_info_t *)sdioh;
 	SDIOH_API_RC status;
 	uint8 data;
 

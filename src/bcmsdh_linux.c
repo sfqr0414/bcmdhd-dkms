@@ -39,7 +39,7 @@
 #include <bcmdefs.h>
 #include <bcmdevs.h>
 #include <linux/irq.h>
-extern void dhdsdio_isr(void * args);
+#include <dhd_proto.h>
 #include <bcmutils.h>
 #include <dngl_stats.h>
 #include <dhd.h>

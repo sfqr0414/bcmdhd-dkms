@@ -138,6 +138,9 @@ int wl_android_wifi_accel_off(struct net_device *dev, bool force_reg_on);
 int wl_android_wifi_on(struct net_device *dev);
 int wl_android_wifi_off(struct net_device *dev, bool on_failure);
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr);
+
+/* BT-coex DHCP helper (used by wl_cfg80211/Android glue) */
+int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *command);
 int wl_handle_private_cmd(struct net_device *net, char *command, u32 cmd_len);
 #ifdef WL_CFG80211
 int wl_android_set_spect(struct net_device *dev, int spect);

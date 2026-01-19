@@ -239,6 +239,22 @@ typedef struct flow_ring_node {
 #endif /* DEVICE_TX_STUCK_DETECT */
 } flow_ring_node_t;
 
+/* ------------------------------------------------------------------------- */
+/* Public prototypes for flowring helpers (move to canonical header if needed) */
+
+/* Return number of priority-backed HT put flowrings per station */
+extern uint8 dhd_num_prio_supported_per_flow_ring(dhd_pub_t *dhdp);
+
+/* Return maximum number of multi-client flow rings supported */
+extern uint8 dhd_get_max_multi_client_flow_rings(dhd_pub_t *dhdp);
+
+/* Create/Destroy flowid map */
+extern int dhd_flowid_map_init(dhd_pub_t *dhdp, uint16 max_tx_flow_rings);
+extern void dhd_flowid_map_deinit(dhd_pub_t *dhdp);
+
+/* Helper: determine whether destination is a TDLS peer */
+extern bool is_tdls_destination(dhd_pub_t *dhdp, uint8 *da);
+
 typedef flow_ring_node_t flow_ring_table_t;
 
 typedef struct flow_hash_info {

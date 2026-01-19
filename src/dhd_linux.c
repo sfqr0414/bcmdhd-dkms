@@ -47,6 +47,11 @@
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 #include <linux/spinlock.h>
+
+#include <dhd.h> /* bring dhd core prototypes (e.g. dhd_open) into this TU */
+
+/* Ensure dhd_open's prototype is visible in this TU (suppress -Wmissing-prototypes) */
+extern int dhd_open(struct net_device *net);
 #include <linux/ethtool.h>
 #include <linux/fcntl.h>
 #include <linux/ip.h>
@@ -68,6 +73,14 @@
 #include <asm/unaligned.h>
 #endif
 #include <dhd_linux_priv.h>
+#include <net/rps.h>
+#include "dhd_protos.h"
+/* All function prototypes should be canonicalized into headers or marked static.
+ * -Wmissing-prototypes suppression removed to surface missing prototype diagnostics.
+ */
+
+/* Ensure bus helper prototype is visible regardless of bus config macros */
+extern uint dhd_bus_chip_id(dhd_pub_t *dhdp);
 #ifdef BCMPCIE
 #ifdef CONFIG_PCIEASPM_ROCKCHIP_WIFI_EXTENSION
 #include <rk_dhd_pcie_linux.h>
@@ -353,6 +366,7 @@ extern void dhd_enable_oob_intr(struct dhd_bus *bus, bool enable);
 static void dhd_hang_process(struct work_struct *work_data);
 #endif /* OEM_ANDROID */
 MODULE_LICENSE("GPL and additional rights");
+MODULE_DESCRIPTION("Broadcom DHD module");
 
 #if defined(MULTIPLE_SUPPLICANT)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25))
@@ -1751,7 +1765,7 @@ dhd_sta_pool_clear(dhd_pub_t *dhdp, int max_sta)
  * Lockless variant of dhd_find_sta()
  * Find STA with MAC address ea in an interface's STA list.
  */
-dhd_sta_t *
+static dhd_sta_t *
 __dhd_find_sta(dhd_if_t *ifp, void *pub, int ifidx, void *ea)
 {
 	dhd_sta_t *sta;
@@ -3007,7 +3021,7 @@ _dhd_set_multicast_list(dhd_info_t *dhd, int ifidx)
 	}
 }
 
-int
+static int
 _dhd_set_mac_address(dhd_info_t *dhd, int ifidx, uint8 *addr, bool skip_stop)
 {
 	int ret;
@@ -6409,8 +6423,7 @@ dhd_ctrl_tcp_limit_output_bytes(int level)
 }
 #endif /* LINUX_VERSION_CODE > 4.19.0 && DHD_TCP_LIMIT_OUTPUT */
 
-void
-dhd_force_collect_socram_during_wifi_onoff(dhd_pub_t *dhdp)
+static void __maybe_unused dhd_force_collect_socram_during_wifi_onoff(dhd_pub_t *dhdp)
 {
 #ifdef OEM_ANDROID
 #ifdef DHD_FW_COREDUMP
@@ -6810,7 +6823,7 @@ dhd_verify_firmware_mode_change(dhd_info_t *dhd)
 }
 #endif /* WLAN_ACCEL_BOOT */
 
-void
+static void
 dhd_force_collect_init_fail_dumps(dhd_pub_t *dhdp)
 {
 #ifndef SKIP_FORCE_INIT_DUMP
@@ -6849,9 +6862,7 @@ dhd_force_collect_init_fail_dumps(dhd_pub_t *dhdp)
 #endif /* SKIP_FORCE_INIT_DUMP */
 }
 
-int
-dhd_open(struct net_device *net)
-{
+int dhd_open(struct net_device *net) {
 	dhd_info_t *dhd = DHD_DEV_INFO(net);
 #ifdef TOE
 	uint32 toe_ol;
@@ -9002,6 +9013,8 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen
 	dhd_info_t *dhd = NULL;
 	struct net_device *net = NULL;
 	char if_name[IFNAMSIZ] = {'\0'};
+	/* Ensure adapter variable exists regardless of bus type configuration */
+	wifi_adapter_info_t *adapter = NULL;
 #if defined(BCMSDIO) || defined(BCMPCIE)
 	uint32 bus_type = -1;
 	uint32 bus_num = -1;
@@ -9009,9 +9022,8 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen
 #if defined(SHOW_LOGTRACE) && !defined(OEM_ANDROID)
 	int ret;
 #endif /* SHOW_LOGTRACE && !OEM_ANDROID */
-	wifi_adapter_info_t *adapter = NULL;
 #elif defined(BCMDBUS)
-	wifi_adapter_info_t *adapter = data;
+	adapter = data;
 #endif
 
 	dhd_attach_states_t dhd_state = DHD_ATTACH_STATE_INIT;
@@ -10305,7 +10317,7 @@ dhd_bus_start(dhd_pub_t *dhdp)
 #endif /* !BCMDBUS */
 
 #ifdef WLTDLS
-int _dhd_tdls_enable(dhd_pub_t *dhd, bool tdls_on, bool auto_on, struct ether_addr *mac)
+static int _dhd_tdls_enable(dhd_pub_t *dhd, bool tdls_on, bool auto_on, struct ether_addr *mac)
 {
 	uint32 tdls = tdls_on;
 	int ret = 0;
@@ -10748,8 +10760,7 @@ dhd_get_fw_capabilities(dhd_pub_t * dhd)
 	return 0;
 }
 
-int
-dhd_optimised_preinit_ioctls(dhd_pub_t * dhd)
+static int __maybe_unused dhd_optimised_preinit_ioctls(dhd_pub_t * dhd)
 {
 	int ret = 0;
 	/*  Room for "event_msgs_ext" + '\0' + bitvec  */
@@ -11556,7 +11567,7 @@ done:
 	return ret;
 }
 
-int
+static int
 dhd_legacy_preinit_ioctls(dhd_pub_t *dhd)
 {
 	int ret = 0;
@@ -14991,36 +15002,9 @@ static int wifi_init_thread(void *data)
 }
 #endif
 
-int rockchip_wifi_init_module_rkwifi(void)
-{
-#ifdef CONFIG_WIFI_LOAD_DRIVER_WHEN_KERNEL_BOOTUP
-	struct task_struct *kthread = NULL;
-
-	kthread = kthread_run(wifi_init_thread, NULL, "wifi_init_thread");
-	if (IS_ERR(kthread))
-		pr_err("create wifi_init_thread failed.\n");
-#else
-	dhd_module_init();
-#endif
-	return 0;
-}
-
-void rockchip_wifi_exit_module_rkwifi(void)
-{
-	dhd_module_exit();
-}
-#ifdef CONFIG_WIFI_BUILD_MODULE
-module_init(rockchip_wifi_init_module_rkwifi);
-module_exit(rockchip_wifi_exit_module_rkwifi);
-#else
-#ifdef CONFIG_WIFI_LOAD_DRIVER_WHEN_KERNEL_BOOTUP
-late_initcall(rockchip_wifi_init_module_rkwifi);
-module_exit(rockchip_wifi_exit_module_rkwifi);
-#else
-module_init(rockchip_wifi_init_module_rkwifi);
-module_exit(rockchip_wifi_exit_module_rkwifi);
-#endif
-#endif
+/* Use standard module init/exit provided by the DHD driver */
+module_init(dhd_module_init);
+module_exit(dhd_module_exit);
 
 #if 0
 #if defined(CONFIG_DEFERRED_INITCALLS) && !defined(EXYNOS_PCIE_MODULE_PATCH)
@@ -21029,6 +21013,7 @@ int dhd_rps_cpus_enable(struct net_device *net, int enable)
 	return BCME_OK;
 }
 
+#if defined(CONFIG_RPS)
 int custom_rps_map_set(struct netdev_rx_queue *queue, char *buf, size_t len)
 {
 	struct rps_map *old_map, *map;
@@ -21114,6 +21099,17 @@ void custom_rps_map_clear(struct netdev_rx_queue *queue)
 		DHD_INFO(("%s : rps_cpus map clear.\n", __FUNCTION__));
 	}
 }
+#else
+int custom_rps_map_set(struct netdev_rx_queue *queue, char *buf, size_t len)
+{
+	/* RPS not supported in this kernel config */
+	return -ENOTSUPP;
+}
+void custom_rps_map_clear(struct netdev_rx_queue *queue)
+{
+	/* no-op when RPS is not available */
+}
+#endif
 #endif // endif
 
 #ifdef DHD_DEBUG_PAGEALLOC
@@ -21530,7 +21526,7 @@ dhd_set_blob_support(dhd_pub_t *dhdp, char *fw_path)
 
 #if defined(PCIE_FULL_DONGLE)
 /** test / loopback */
-void
+static void
 dmaxfer_free_dmaaddr_handler(void *handle, void *event_info, u8 event)
 {
 	dmaxref_mem_map_t *dmmap = (dmaxref_mem_map_t *)event_info;
@@ -22233,7 +22229,7 @@ dhd_protocol_matches_profile(uint8 *p, int plen, const dhd_tx_profile_protocol_t
 #ifdef BCMPCIE
 #define KIRQ_PRINT_BUF_LEN 256
 
-void
+static void
 dhd_print_kirqstats(dhd_pub_t *dhd, unsigned int irq_num)
 {
 	unsigned long flags = 0;
@@ -22255,9 +22251,12 @@ dhd_print_kirqstats(dhd_pub_t *dhd, unsigned int irq_num)
 	bcm_binit(&strbuf, tmp_buf, KIRQ_PRINT_BUF_LEN);
 	raw_spin_lock_irqsave(&desc->lock, flags);
 	bcm_bprintf(&strbuf, "dhd irq %u:", irq_num);
-	for_each_online_cpu(i)
-		bcm_bprintf(&strbuf, "%10u ",
-			desc->kstat_irqs ? *per_cpu_ptr(desc->kstat_irqs, i) : 0);
+	for_each_online_cpu(i) {
+		unsigned int irqcnt = 0;
+		if (desc->kstat_irqs)
+			irqcnt = per_cpu_ptr(desc->kstat_irqs, i)->cnt;
+		bcm_bprintf(&strbuf, "%10u ", irqcnt);
+	}
 	if (desc->irq_data.chip) {
 		if (desc->irq_data.chip->name)
 			bcm_bprintf(&strbuf, " %8s", desc->irq_data.chip->name);
@@ -24344,3 +24343,6 @@ dhd_wakelock_wd_counter_get(dhd_pub_t *pub)
 	return ((dhd_info_t *)pub)->wakelock_wd_counter;
 }
 #endif /* DHD_DEBUG_WAKE_LOCK */
+
+/* Restore diagnostic state pushed earlier */
+#pragma GCC diagnostic pop

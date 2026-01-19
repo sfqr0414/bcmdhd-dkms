@@ -87,7 +87,7 @@
 
 #include <dhd_plat.h>
 
-#ifdef CONFIG_ARCH_ROCKCHIP
+#if IS_ENABLED(CONFIG_PCIEASPM_ROCKCHIP_WIFI_EXTENSION)
 #include <linux/aspm_ext.h>
 #endif
 
@@ -2408,10 +2408,10 @@ dhdpcie_start_host_dev(dhd_bus_t *bus)
 	ret = tegra_pcie_pm_resume();
 #endif /* CONFIG_ARCH_TEGRA_210_SOC */
 #endif /* CONFIG_ARCH_TEGRA */
-#ifdef CONFIG_ARCH_ROCKCHIP
+#if IS_ENABLED(CONFIG_PCIEASPM_ROCKCHIP_WIFI_EXTENSION)
 	if (bus->rc_dev)
 		ret = rockchip_dw_pcie_pm_ctrl_for_user(bus->rc_dev, ROCKCHIP_PCIE_PM_CTRL_RESET);
-#endif /* CONFIG_ARCH_ROCKCHIP */
+#endif /* CONFIG_PCIEASPM_ROCKCHIP_WIFI_EXTENSION */
 
 	if (ret) {
 		DHD_ERROR(("%s Failed to bring up PCIe link\n", __FUNCTION__));

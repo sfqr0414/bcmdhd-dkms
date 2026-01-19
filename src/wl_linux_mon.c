@@ -37,6 +37,7 @@
 #include <dhd_dbg.h>
 #include <dngl_stats.h>
 #include <dhd.h>
+#include <dhd_linux.h>
 #endif /* defined(BCMDONGLEHOST) */
 #if defined(__linux__)
 #include <bcmstdlib_s.h>
@@ -49,14 +50,7 @@ typedef enum monitor_states
 	MONITOR_STATE_INTERFACE_ADDED = 0x2,
 	MONITOR_STATE_INTERFACE_DELETED = 0x4
 } monitor_states_t;
-/*
- * Some external functions, TODO: move them to dhd_linux.h
- */
-int dhd_add_monitor(const char *name, struct net_device **new_ndev);
-extern netdev_tx_t dhd_start_xmit(struct sk_buff *skb, struct net_device *net);
-int dhd_del_monitor(struct net_device *ndev);
-int dhd_monitor_init(void *dhd_pub);
-int dhd_monitor_uninit(void);
+/* Monitor helpers — canonical prototypes moved to src/dhd_linux.h */
 
 /**
  * Local declarations and defintions (not exposed)

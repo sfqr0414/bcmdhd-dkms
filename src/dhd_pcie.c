@@ -3856,8 +3856,7 @@ dhd_bus_download_firmware(struct dhd_bus *bus, osl_t *osh,
 	return ret;
 }
 
-void
-dhd_set_bus_params(struct dhd_bus *bus)
+int dhd_set_bus_params(struct dhd_bus *bus)
 {
 	struct dhd_conf *conf = bus->dhd->conf;
 
@@ -3881,6 +3880,7 @@ dhd_set_bus_params(struct dhd_bus *bus)
 		bool l1ss = conf->l1ss ? TRUE : FALSE;
 		dhd_bus_l1ss_enable_rc_ep(bus, l1ss);
 	}
+	return 0;
 }
 
 /**

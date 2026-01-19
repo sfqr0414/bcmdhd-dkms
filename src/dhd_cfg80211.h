@@ -42,6 +42,10 @@ s32 dhd_cfg80211_deinit(struct bcm_cfg80211 *cfg);
 s32 dhd_cfg80211_down(struct bcm_cfg80211 *cfg);
 s32 dhd_cfg80211_set_p2p_info(struct bcm_cfg80211 *cfg, int val);
 s32 dhd_cfg80211_clean_p2p_info(struct bcm_cfg80211 *cfg);
+/* Added: prototypes for netdev cleanup helpers to satisfy -Wmissing-prototypes */
+struct net_device *dhd_cfg80211_netdev_free(struct net_device *ndev);
+void dhd_netdev_free(struct net_device *ndev);
+
 s32 dhd_config_dongle(struct bcm_cfg80211 *cfg);
 int dhd_cfgvendor_priv_string_handler(struct bcm_cfg80211 *cfg,
 	struct wireless_dev *wdev, const struct bcm_nlmsg_hdr *nlioc, void  *data);

@@ -34,10 +34,12 @@
 #include <dhdioctl.h>
 #include <wlioctl.h>
 
+/* Strict prototype checking enabled for this compilation unit */
+
 #ifdef PKT_FILTER_SUPPORT
 extern uint dhd_pkt_filter_enable;
 extern uint dhd_master_mode;
-extern void dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable, int master_mode);
+/* dhd_pktfilter_offload_enable: canonical prototype is in src/dhd.h */
 #endif
 
 typedef enum wl_cfg_btcx_timer_trig_type {

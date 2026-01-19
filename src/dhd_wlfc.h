@@ -549,6 +549,8 @@ int dhd_wlfc_resume(dhd_pub_t *dhd);
 #endif /* SUPPORT_P2P_GO_PS */
 int dhd_wlfc_hostreorder_init(dhd_pub_t *dhd);
 int dhd_wlfc_cleanup_txq(dhd_pub_t *dhd, f_processpkt_t fn, void *arg);
+/* Internal cleanup used by detach/shutdown: provide prototype to satisfy -Wmissing-prototypes */
+void _dhd_wlfc_cleanup(dhd_pub_t *dhd, f_processpkt_t fn, void *arg);
 int dhd_wlfc_cleanup(dhd_pub_t *dhd, f_processpkt_t fn, void* arg);
 int dhd_wlfc_deinit(dhd_pub_t *dhd);
 int dhd_wlfc_interface_event(dhd_pub_t *dhdp, uint8 action, uint8 ifid, uint8 iftype, uint8* ea);

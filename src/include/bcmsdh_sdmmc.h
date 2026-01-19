@@ -122,6 +122,13 @@ extern void sdioh_sdmmc_reg_unmap(osl_t *osh, int32 addr, int size);
 extern int sdioh_sdmmc_register_irq(sdioh_info_t *sd, uint irq);
 extern void sdioh_sdmmc_free_irq(uint irq, sdioh_info_t *sd);
 
+/* Helper handlers provided by per-port code */
+extern int sdio_func_reg_notify(void* semaphore);
+extern void sdio_func_unreg_notify(void);
+
+/* Enable/disable HW OOB interrupt (void* for opaque per-port handle) */
+extern SDIOH_API_RC sdioh_enable_hw_oob_intr(void *sdioh, bool enable);
+
 extern sdioh_info_t *sdioh_attach(osl_t *osh, struct sdio_func *func);
 extern SDIOH_API_RC sdioh_detach(osl_t *osh, sdioh_info_t *sd);
 

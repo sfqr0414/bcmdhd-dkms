@@ -113,8 +113,8 @@ extern int wldev_set_country(struct net_device *dev, char *country_code, bool no
 extern int net_os_wake_lock(struct net_device *dev);
 extern int net_os_wake_unlock(struct net_device *dev);
 extern int net_os_wake_lock_timeout(struct net_device *dev);
-extern int net_os_wake_lock_timeout_enable(struct net_device *dev, int val);
-extern int net_os_set_dtim_skip(struct net_device *dev, int val);
+extern int net_os_wake_lock_timeout_enable(struct net_device *dev, int val);/* RX-specific wake lock control (added to satisfy -Wmissing-prototypes) */
+extern int net_os_wake_lock_rx_timeout_enable(struct net_device *dev, int val);extern int net_os_set_dtim_skip(struct net_device *dev, int val);
 extern int net_os_set_suspend_disable(struct net_device *dev, int val);
 extern int net_os_set_suspend(struct net_device *dev, int val, int force);
 extern int net_os_set_suspend_bcn_li_dtim(struct net_device *dev, int val);

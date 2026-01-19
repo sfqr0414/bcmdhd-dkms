@@ -39,6 +39,19 @@
 #include <dhd.h>
 #include <dhd_proto.h>
 
+/* Local prototypes removed — canonical declarations are in dhd_proto.h */
+/* Prototypes: dhd_set_host_cap, dhd_prot_clearcounts, dhd_prot_update_rings_size,
+ * dhd_prepare_schedule_dmaxfer_free, dhd_prot_clean_flow_ring,
+ * dhd_msgbuf_delay_post_ts_bufs
+ */
+/* Explicit local declarations to satisfy -Wmissing-prototypes */
+extern void dhd_set_host_cap(dhd_pub_t *dhd);
+extern void dhd_prot_clearcounts(dhd_pub_t *dhd);
+extern void dhd_prot_update_rings_size(dhd_prot_t *prot);
+extern int dhd_prepare_schedule_dmaxfer_free(dhd_pub_t *dhdp);
+extern void dhd_prot_clean_flow_ring(dhd_pub_t *dhd, void *msgbuf_flow_info);
+extern void dhd_msgbuf_delay_post_ts_bufs(dhd_pub_t *dhd);
+
 #include <dhd_bus.h>
 
 #include <dhd_dbg.h>
@@ -231,8 +244,7 @@ struct msgbuf_ring; /* ring context for common and flow rings */
  * On success: return cmn_msg_hdr_t::msg_type
  * On failure: return 0 (invalid msg_type)
  */
-typedef uint8 (* d2h_sync_cb_t)(dhd_pub_t *dhd, struct msgbuf_ring *ring,
-                                volatile cmn_msg_hdr_t *msg, int msglen);
+/* d2h_sync_cb_t moved to dhd_proto.h */
 
 void dhd_prot_debug_ring_info(dhd_pub_t *dhd);
 
@@ -424,19 +436,7 @@ typedef int (* d2h_edl_sync_cb_t)(dhd_pub_t *dhd, struct msgbuf_ring *ring,
 		 (flowid) < ((total_flowrings) + DHD_FLOWRING_START_FLOWID); \
 		 (ring)++, (flowid)++)
 
-/* Used in loopback tests */
-typedef struct dhd_dmaxfer {
-	dhd_dma_buf_t srcmem;
-	dhd_dma_buf_t dstmem;
-	uint32        srcdelay;
-	uint32        destdelay;
-	uint32        len;
-	bool          in_progress;
-	uint64        start_usec;
-	uint64        time_taken;
-	uint32        d11_lpbk;
-	int           status;
-} dhd_dmaxfer_t;
+/* dhd_dmaxfer_t moved to dhd_proto.h */
 
 #ifdef DHD_HMAPTEST
 /* Used in HMAP test */
@@ -461,37 +461,8 @@ typedef struct dhd_hmaptest {
  * host will update the WR/RD index in the DMA indices array in host memory or
  * directly in dongle memory.
  */
-typedef struct msgbuf_ring {
-	bool           inited;
-	uint16         idx;       /* ring id */
-	uint16         rd;        /* read index */
-	uint16         curr_rd;   /* read index for debug */
-	uint16         wr;        /* write index */
-	uint16         max_items; /* maximum number of items in ring */
-	uint16         item_len;  /* length of each item in the ring */
-	sh_addr_t      base_addr; /* LITTLE ENDIAN formatted: base address */
-	dhd_dma_buf_t  dma_buf;   /* DMA-able buffer: pa, va, len, dmah, secdma */
-	uint32         seqnum;    /* next expected item's sequence number */
-#ifdef TXP_FLUSH_NITEMS
-	void           *start_addr;
-	/* # of messages on ring not yet announced to dongle */
-	uint16         pend_items_count;
-#ifdef AGG_H2D_DB
-	osl_atomic_t	inflight;
-#endif /* AGG_H2D_DB */
-#endif /* TXP_FLUSH_NITEMS */
+/* msgbuf_ring_t moved to dhd_proto.h */
 
-	uint8           ring_type;
-	uint8           n_completion_ids;
-	bool            create_pending;
-	uint16          create_req_id;
-	uint8           current_phase;
-	uint16	        compeltion_ring_ids[MAX_COMPLETION_RING_IDS_ASSOCIATED];
-	uchar		name[RING_NAME_MAX_LENGTH];
-	uint32		ring_mem_allocated;
-	void	        *ring_lock;
-	struct msgbuf_ring *linked_ring; /* Ring Associated to metadata ring */
-} msgbuf_ring_t;
 
 #define DHD_RING_BGN_VA(ring)           ((ring)->dma_buf.va)
 #define DHD_RING_END_VA(ring) \
@@ -601,56 +572,7 @@ typedef struct _agg_h2d_db_info {
 
 #define DHD_DEBUG_INVALID_PKTID
 
-/** DHD protocol handle. Is an opaque type to other DHD software layers. */
-typedef struct dhd_prot {
-	osl_t *osh;		/* OSL handle */
-	uint16 rxbufpost_sz;		/* Size of rx buffer posted to dongle */
-	uint16 rxbufpost_alloc_sz;	/* Actual rx buffer packet allocated in the host */
-	uint16 rxbufpost;
-	uint16 rx_buf_burst;
-	uint16 rx_bufpost_threshold;
-	uint16 max_rxbufpost;
-	uint32 tot_rxbufpost;
-	uint32 tot_rxcpl;
-	uint16 max_eventbufpost;
-	uint16 max_ioctlrespbufpost;
-	uint16 max_tsbufpost;
-	uint16 max_infobufpost;
-	uint16 infobufpost;
-	uint16 cur_event_bufs_posted;
-	uint16 cur_ioctlresp_bufs_posted;
-	uint16 cur_ts_bufs_posted;
-
-	/* Flow control mechanism based on active transmits pending */
-	osl_atomic_t active_tx_count; /* increments/decrements on every packet tx/tx_status */
-	uint16 h2d_max_txpost;
-	uint16 h2d_htput_max_txpost;
-	uint16 txp_threshold;  /* optimization to write "n" tx items at a time to ring */
-
-	/* MsgBuf Ring info: has a dhd_dma_buf that is dynamically allocated */
-	msgbuf_ring_t h2dring_ctrl_subn; /* H2D ctrl message submission ring */
-	msgbuf_ring_t h2dring_rxp_subn; /* H2D RxBuf post ring */
-	msgbuf_ring_t d2hring_ctrl_cpln; /* D2H ctrl completion ring */
-	msgbuf_ring_t d2hring_tx_cpln; /* D2H Tx complete message ring */
-	msgbuf_ring_t d2hring_rx_cpln; /* D2H Rx complete message ring */
-	msgbuf_ring_t *h2dring_info_subn; /* H2D info submission ring */
-	msgbuf_ring_t *d2hring_info_cpln; /* D2H info completion ring */
-	msgbuf_ring_t *d2hring_edl; /* D2H Enhanced Debug Lane (EDL) ring */
-
-	msgbuf_ring_t *h2d_flowrings_pool; /* Pool of preallocated flowings */
-	dhd_dma_buf_t flowrings_dma_buf; /* Contiguous DMA buffer for flowrings */
-	uint16        h2d_rings_total; /* total H2D (common rings + flowrings) */
-
-	uint32		rx_dataoffset;
-
-	dhd_mb_ring_t	mb_ring_fn;	/* called when dongle needs to be notified of new msg */
-	dhd_mb_ring_2_t	mb_2_ring_fn;	/* called when dongle needs to be notified of new msg */
-
-	/* ioctl related resources */
-	uint8 ioctl_state;
-	int16 ioctl_status;		/* status returned from dongle */
-	uint16 ioctl_resplen;
-	dhd_ioctl_recieved_status_t ioctl_received;
+dhd_ioctl_recieved_status_t ioctl_received;
 	uint curr_ioctl_cmd;
 	dhd_dma_buf_t	retbuf;		/* For holding ioctl response */
 	dhd_dma_buf_t	ioctbuf;	/* For holding ioctl request */
@@ -781,7 +703,8 @@ typedef struct dhd_prot {
 	uint32 tx_cpl_bound;
 	/* no. which controls how many ctrl cpl/post items are processed per dpc */
 	uint32 ctrl_cpl_post_bound;
-} dhd_prot_t;
+/* dhd_prot_t moved to dhd_proto.h */
+
 
 #ifdef DHD_EWPR_VER2
 #define HANG_INFO_BASE64_BUFFER_SIZE 640

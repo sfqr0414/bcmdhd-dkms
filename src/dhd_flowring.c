@@ -38,6 +38,7 @@
 #include <dngl_stats.h>
 
 #include <dhd.h>
+#include <dhd_flowring.h>
 
 #include <dhd_flowring.h>
 #include <dhd_bus.h>

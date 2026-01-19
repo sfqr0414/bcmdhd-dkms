@@ -86,6 +86,9 @@ extern void wl_cfg80211_abort_scan(struct wiphy *wiphy, struct wireless_dev *wde
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) */
 extern s32 wl_init_scan(struct bcm_cfg80211 *cfg);
 extern int wl_cfg80211_scan_stop(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev);
+/* Added: prototypes to satisfy -Wmissing-prototypes warnings */
+extern struct net_device *wl_get_scan_ndev(struct bcm_cfg80211 *cfg);
+extern void wl_notify_scan_done(struct bcm_cfg80211 *cfg, bool aborted);
 extern s32 wl_notify_scan_status(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 	const wl_event_msg_t *e, void *data);
 extern void wl_cfg80211_set_passive_scan(struct net_device *dev, char *command);
@@ -227,6 +230,9 @@ void add_roam_cache(struct bcm_cfg80211 *cfg, wl_bss_info_v109_t *bi);
 int get_roam_channel_list(struct bcm_cfg80211 *cfg, chanspec_t target_chan, chanspec_t *channels,
 	int n_channels, const wlc_ssid_t *ssid, int ioctl_ver);
 void set_roam_band(int band);
+int init_roam_cache(struct bcm_cfg80211 *cfg, int ioctl_ver);
+void print_roam_cache(struct bcm_cfg80211 *cfg);
+void wl_update_roamscan_cache_by_band(struct net_device *dev, int band);
 #endif /* ESCAN_CHANNEL_CACHE */
 
 #ifdef WL11U

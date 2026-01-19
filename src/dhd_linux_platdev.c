@@ -34,6 +34,9 @@
 #include <dhd.h>
 #include <dhd_bus.h>
 #include <dhd_linux.h>
+#include "dhd_protos.h"
+
+/* Prototypes for platform helpers are provided in dhd_protos.h; strict prototype checking enabled */
 #if defined(OEM_ANDROID)
 #include <wl_android.h>
 #endif
@@ -57,7 +60,7 @@ extern void dhd_wlan_deinit_plat_data(wifi_adapter_info_t *adapter);
 
 #if defined(SUPPORT_MULTIPLE_BOARD_REVISION)
 #include <linux/of.h>
-extern char* dhd_get_device_dt_name(void);
+/* weak dhd_get_device_dt_name is implemented below; no extern needed here */
 #endif /* SUPPORT_MULTIPLE_BOARD_REVISION */
 
 #ifdef DHD_WIFI_SHUTDOWN
@@ -176,7 +179,7 @@ wifi_adapter_info_t* dhd_wifi_platform_get_adapter(uint32 bus_type, uint32 bus_n
 }
 
 #if defined(CONFIG_WIFI_CONTROL_FUNC) && defined(CONFIG_DHD_USE_STATIC_BUF)
-extern void *dhd_wlan_mem_prealloc(int section, unsigned long size);
+/* dhd_wlan_mem_prealloc: canonical prototype in src/dhd.h */
 #endif /* CONFIG_WIFI_CONTROL_FUNC && CONFIG_DHD_USE_STATIC_BUF */
 
 void* wifi_platform_prealloc(wifi_adapter_info_t *adapter, int section, unsigned long size)
@@ -676,7 +679,7 @@ static int wifi_ctrlfunc_register_drv(void)
 	return wifi_plat_dev_probe_ret;
 }
 
-void wifi_ctrlfunc_unregister_drv(void)
+static void wifi_ctrlfunc_unregister_drv(void)
 {
 #ifndef CONFIG_DTS
 	wifi_adapter_info_t *adapter = NULL;
@@ -1286,8 +1289,7 @@ uint16 __attribute__ ((weak)) dhd_plat_align_rxbuf_size(uint16 rxbufpost_sz)
 	return rxbufpost_sz;
 }
 
-int
-__attribute__ ((weak)) dhd_get_platform_naming_for_nvram_clmblob_file(download_type_t component,
+int __attribute__ ((weak)) dhd_get_platform_naming_for_nvram_clmblob_file(download_type_t component,
 	char *file_name)
 {
 	return BCME_ERROR;

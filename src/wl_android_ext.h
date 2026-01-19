@@ -33,6 +33,11 @@ int wl_ext_autochannel(struct net_device *dev, uint acs, uint32 band,
 chanspec_band_t wl_ext_wlcband_to_chanspec_band(int band);
 int wl_android_ext_priv_cmd(struct net_device *net, char *command, int total_len,
 	int *bytes_written);
+
+/* Added prototypes to satisfy -Wmissing-prototypes */
+int wl_ext_conf_iovar(struct net_device *dev, char *command, int total_len);
+int wl_ext_get_distance(struct net_device *net, u32 band);
+int wl_ext_fw_apcs(struct net_device *dev, uint32 band, wl_scan_info_t *scan_info);
 void wl_ext_get_sec(struct net_device *dev, int ifmode, char *sec, int total_len, bool dump);
 bool wl_ext_check_scan(struct net_device *dev, dhd_pub_t *dhdp);
 int wl_ext_set_scan_time(struct net_device *dev, int scan_time,

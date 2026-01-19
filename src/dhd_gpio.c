@@ -2,23 +2,18 @@
 #include <osl.h>
 #include <dhd_linux.h>
 #include <linux/gpio.h>
+#include <linux/delay.h>
+
 #ifdef BCMDHD_DTS
 #include <linux/of_gpio.h>
 #endif
 #ifdef BCMDHD_PLATDEV
 #include <linux/platform_device.h>
 #endif
-#ifdef CUSTOMER_HW_ROCKCHIP
-#include <linux/rfkill-wlan.h>
-#endif
+/* Rockchip-specific rfkill removed; use standard RFKill in cfg80211 */
 
 #ifdef CONFIG_DHD_USE_STATIC_BUF
-#if defined(BCMDHD_MDRIVER) && !defined(DHD_STATIC_IN_DRIVER)
-extern void *dhd_wlan_mem_prealloc(uint bus_type, int index,
-	int section, unsigned long size);
-#else
-extern void *dhd_wlan_mem_prealloc(int section, unsigned long size);
-#endif
+/* use canonical prototype: void *dhd_wlan_mem_prealloc( ... ) declared in src/dhd.h */
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
 #ifdef CUSTOMER_HW_ROCKCHIP
 #ifdef BCMPCIE
@@ -54,12 +49,8 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 				return -EIO;
 			}
 		}
-#ifdef CUSTOMER_HW_ROCKCHIP
-		rockchip_wifi_power(1);
-#ifdef BCMPCIE
-//		rk_pcie_power_on_atu_fixup();
-#endif
-#endif
+		/* Standardized power sequence: wait for module to power up */
+		mdelay(20);
 #ifdef BUS_POWER_RESTORE
 #ifdef BCMPCIE
 		if (adapter->pci_dev) {
@@ -98,9 +89,8 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 				return -EIO;
 			}
 		}
-#ifdef CUSTOMER_HW_ROCKCHIP
-		rockchip_wifi_power(0);
-#endif
+		/* Standardized power sequence: wait for module to power down */
+		mdelay(20);
 	}
 
 	return err;
@@ -123,9 +113,7 @@ dhd_wlan_set_carddetect(int present)
 #ifdef CUSTOMER_HW_PLATFORM
 		err = sdhci_force_presence_change(&sdmmc_channel, 1);
 #endif /* CUSTOMER_HW_PLATFORM */
-#ifdef CUSTOMER_HW_ROCKCHIP
-		rockchip_wifi_set_carddetect(1);
-#endif
+/* platform-specific card-detect removed; rely on standard sdhci presence change */
 #elif defined(BCMPCIE)
 		printf("======== Card detection to detect PCIE card! ========\n");
 #endif
@@ -135,9 +123,7 @@ dhd_wlan_set_carddetect(int present)
 #ifdef CUSTOMER_HW_PLATFORM
 		err = sdhci_force_presence_change(&sdmmc_channel, 0);
 #endif /* CUSTOMER_HW_PLATFORM */
-#ifdef CUSTOMER_HW_ROCKCHIP
-		rockchip_wifi_set_carddetect(0);
-#endif
+/* platform-specific card-detect removed; rely on standard sdhci presence change */
 #elif defined(BCMPCIE)
 		printf("======== Card detection to remove PCIE card! ========\n");
 #endif
@@ -161,8 +147,16 @@ dhd_wlan_get_mac_addr(unsigned char *buf, int ifidx)
 		struct ether_addr ea_example = {{0x02, 0x11, 0x22, 0x33, 0x44, 0x55}};
 		bcopy((char *)&ea_example, buf, sizeof(struct ether_addr));
 #endif /* EXAMPLE_GET_MAC */
-#ifdef CUSTOMER_HW_ROCKCHIP
-		err = rockchip_wifi_mac_addr(buf);
+#ifdef BCMDHD_PLATDEV
+		if (adapter->pdev && adapter->pdev->dev.of_node) {
+			const void *mac_addr;
+			int mac_len;
+			mac_addr = of_get_property(adapter->pdev->dev.of_node, "mac-address", &mac_len);
+			if (mac_addr && mac_len >= 6) {
+				memcpy(buf, mac_addr, 6);
+				err = 0;
+			}
+		}
 #endif
 	}
 
@@ -331,6 +325,8 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 			return -1;
 		}
 	}
+/* No platform-specific override: use gpio_to_irq() result when available */
+
 #ifdef CUSTOMER_HW_ROCKCHIP
 	host_oob_irq = rockchip_wifi_get_oob_irq();
 #endif

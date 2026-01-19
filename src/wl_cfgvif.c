@@ -26,6 +26,8 @@
 #include <linuxver.h>
 #include <linux/kernel.h>
 
+/* Strict prototype checking enabled for this compilation unit */
+
 #include <bcmutils.h>
 #include <bcmstdlib_s.h>
 #include <bcmwifi_channels.h>
@@ -241,7 +243,7 @@ bool wl_cfg80211_is_oce_ap(struct wiphy *wiphy, const u8 *bssid_hint)
 #endif /* WL_FW_OCE_AP_SELECT */
 
 /* Dump the contents of the encoded wps ie buffer and get pbc value */
-void
+static void
 wl_validate_wps_ie(const char *wps_ie, s32 wps_ie_len, bool *pbc)
 {
 	#define WPS_IE_FIXED_LEN 6
@@ -1680,6 +1682,17 @@ wl_is_sta_connected(struct bcm_cfg80211 *cfg)
 
 	return sta_connected;
 }
+
+/* Local forward prototypes to satisfy -Wmissing-prototypes */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0))
+extern s32 wl_cfg80211_set_channel(struct wiphy *wiphy, struct net_device *dev,
+	struct ieee80211_channel *chan,
+	enum nl80211_channel_type channel_type);
+#else
+extern s32 wl_cfg80211_set_channel(struct wiphy *wiphy, struct net_device *dev,
+	struct ieee80211_channel *chan,
+	enum nl80211_chan_width width);
+#endif
 
 s32
 wl_cfg80211_set_channel(struct wiphy *wiphy, struct net_device *dev,

@@ -6,6 +6,14 @@
 #include <linux/err.h>
 #include <linux/skbuff.h>
 
+/* Prototype to satisfy -Wmissing-prototypes */
+void *dhd_wlan_mem_prealloc(
+#if defined(BCMDHD_MDRIVER) && !defined(DHD_STATIC_IN_DRIVER)
+	uint bus_type, int index,
+#endif
+	int section, unsigned long size);
+
+
 #define	DHD_STATIC_VERSION_STR		"101.10.361.36 (wlan=r892223-20231107-1)"
 #define STATIC_ERROR_LEVEL	BIT(0)
 #define STATIC_TRACE_LEVEL	BIT(1)
@@ -651,4 +659,5 @@ dhd_static_buf_exit(void)
 module_init(dhd_static_buf_init);
 module_exit(dhd_static_buf_exit);
 MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("Broadcom DHD static buffer module");
 #endif

@@ -27,6 +27,9 @@
 #include <linux/sched.h>
 #include <typedefs.h>
 #include <linuxver.h>
+#include "dhd_protos.h"
+
+/* Prototypes moved into dhd_protos.h; strict prototype checking enabled */
 
 int setScheduler(struct task_struct *p, int policy, struct sched_param *param)
 {

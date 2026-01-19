@@ -25,43 +25,43 @@
 #define	_siutils_priv_h_
 
 #if defined(BCMDBG_ERR) && defined(ERR_USE_LOG_EVENT)
-#define	SI_ERROR(args)	EVENT_LOG_COMPACT_CAST_PAREN_ARGS(EVENT_LOG_TAG_SI_ERROR, args)
+#define	SI_ERROR(args) EVENT_LOG_COMPACT_CAST_PAREN_ARGS(EVENT_LOG_TAG_SI_ERROR, args)
 #elif defined(BCMDBG_ERR) || defined(SI_ERROR_ENFORCE)
-#define	SI_ERROR(args)	printf args
+#define	SI_ERROR(args) do { printf args; } while (0)
 #else
-#define	SI_ERROR(args)
+#define	SI_ERROR(args) do { } while (0)
 #endif	/* BCMDBG_ERR */
 
 #if defined(ENABLE_CORECAPTURE)
 
 #if !defined(BCMDBG)
-#define	SI_PRINT(args)	osl_wificc_logDebug args
+#define	SI_PRINT(args) do { osl_wificc_logDebug args; } while (0)
 #else
-#define	SI_PRINT(args)	printf args
+#define	SI_PRINT(args) do { printf args; } while (0)
 #endif /* !BCMDBG */
 
 #else
 
-#define	SI_PRINT(args)	printf args
+#define	SI_PRINT(args) do { printf args; } while (0)
 
 #endif /* ENABLE_CORECAPTURE */
 
 #ifdef BCMDBG
-#define	SI_MSG(args)	printf args
+#define	SI_MSG(args) do { printf args; } while (0)
 #else
-#define	SI_MSG(args)
+#define	SI_MSG(args) do { } while (0)
 #endif	/* BCMDBG */
 
 #ifdef DHD_DEBUG_REG_DUMP
-#define	SI_MSG_DBG_REG(args)	printf args
+#define	SI_MSG_DBG_REG(args) do { printf args; } while (0)
 #else
-#define	SI_MSG_DBG_REG(args)
+#define	SI_MSG_DBG_REG(args) do { } while (0)
 #endif /* DHD_DEBUG_REG_DUMP */
 
 #ifdef BCMDBG_SI
-#define	SI_VMSG(args)	printf args
+#define	SI_VMSG(args) do { printf args; } while (0)
 #else
-#define	SI_VMSG(args)
+#define	SI_VMSG(args) do { } while (0)
 #endif
 
 #define	IS_SIM(chippkg)	((chippkg == HDLSIM_PKG_ID) || (chippkg == HWSIM_PKG_ID))

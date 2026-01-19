@@ -68,6 +68,8 @@
 #include <dhd_proto.h>
 #include <dhd_dbg.h>
 #include <dhdioctl.h>
+/* Central prototypes header to satisfy -Wmissing-prototypes in TUs */
+#include "dhd_protos.h"
 #include <sdiovar.h>
 #include <wl_android.h>
 #include <dhd_config.h>
@@ -639,7 +641,7 @@ static struct dhd_dbg_bus_ops_s  bus_ops = {
 #define ALIGNMENT  4
 
 #if (defined(OOB_INTR_ONLY) && defined(HW_OOB)) || defined(FORCE_WOWLAN)
-extern void bcmsdh_enable_hw_oob_intr(void *sdh, bool enable);
+extern void bcmsdh_enable_hw_oob_intr(bcmsdh_info_t *sdh, bool enable);
 #endif
 
 #if defined(OOB_INTR_ONLY) && defined(SDIO_ISR_THREAD)
@@ -664,16 +666,14 @@ static const uint max_roundup = 512;
 static bool dhd_readahead;
 
 #if defined(BCMSDIOH_TXGLOM_EXT)
-bool
-dhdsdio_is_dataok(dhd_bus_t *bus) {
+bool dhdsdio_is_dataok(struct dhd_bus *bus) {
 	return (((uint8)(bus->tx_max - bus->tx_seq) - bus->dhd->conf->tx_max_offset > 1) && \
 	(((uint8)(bus->tx_max - bus->tx_seq) & 0x80) == 0));
-}
+} 
 
-uint8
-dhdsdio_get_databufcnt(dhd_bus_t *bus) {
+uint8 dhdsdio_get_databufcnt(struct dhd_bus *bus) {
 	return ((uint8)(bus->tx_max - bus->tx_seq) - 1 - bus->dhd->conf->tx_max_offset);
-}
+} 
 #endif
 
 /* To check if there's window offered */
@@ -1376,9 +1376,10 @@ dhdsdio_clk_kso_enab(dhd_bus_t *bus, bool on)
 	else
 		conf->kso_try_array[9] += 1;
 #endif
-	if (try_cnt > 2)
+	if (try_cnt > 2) {
 		KSO_DBG(("%s> op:%s, try_cnt:%d, rd_val:%x, ERR:%x \n",
 			__FUNCTION__, (on ? "KSO_SET" : "KSO_CLR"), try_cnt, rd_val, err));
+	}
 
 	if (try_cnt > try_max)  {
 		DHD_ERROR(("%s> op:%s, ERROR: try_cnt:%d, rd_val:%x, ERR:%x \n",
@@ -1457,8 +1458,7 @@ dhdsdio_sleepcsr_get(dhd_bus_t *bus)
 	return val;
 }
 
-uint8
-dhdsdio_devcap_get(dhd_bus_t *bus)
+uint8 dhdsdio_devcap_get(struct dhd_bus *bus)
 {
 	return bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_0, SDIOD_CCCR_BRCM_CARDCAP, NULL);
 }
@@ -4573,8 +4573,7 @@ dhd_socram_dump(dhd_bus_t * bus)
 #endif
 }
 
-int
-dhdsdio_downloadvars(dhd_bus_t *bus, void *arg, int len)
+int dhdsdio_downloadvars(struct dhd_bus *bus, void *arg, int len)
 {
 	int bcmerror = BCME_OK;
 
@@ -8686,8 +8685,7 @@ dhd_bus_dpc(struct dhd_bus *bus)
 	return resched;
 }
 
-void
-dhdsdio_isr(void *arg)
+void dhdsdio_isr(void *arg)
 {
 	dhd_bus_t *bus = (dhd_bus_t*)arg;
 	bcmsdh_info_t *sdh;

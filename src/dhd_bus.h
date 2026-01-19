@@ -55,6 +55,11 @@ extern void dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex);
 /* Initialize bus module: prepare for communication w/dongle */
 extern int dhd_bus_init(dhd_pub_t *dhdp, bool enforce_mutex);
 
+/* Detach and cleanup bus (canonical) */
+extern void dhd_bus_detach(dhd_pub_t *dhdp);
+extern void dhd_bus_pktq_flush(dhd_pub_t *dhdp);
+
+
 /* Get the Bus Idle Time */
 extern void dhd_bus_getidletime(dhd_pub_t *dhdp, int *idletime);
 
@@ -115,6 +120,15 @@ extern void dhd_bus_dump_flowring(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf);
 /* Clear any bus counters */
 extern void dhd_bus_clearcounts(dhd_pub_t *dhdp);
 
+/* Transient exported helpers for statistics and SR memory checks */
+extern void dhd_bus_dump_txpktstatics(dhd_pub_t *dhdp);
+extern void dhd_bus_clear_txpktstatics(dhd_pub_t *dhdp);
+/* SR memory size check is a void helper */
+extern void dhd_bus_check_srmemsize(dhd_pub_t *dhdp);
+
+/* Enable/disable OOB interrupt hooks */
+extern void dhd_enable_oob_intr(struct dhd_bus *bus, bool enable);
+
 /* return the dongle chipid */
 extern uint dhd_bus_chip(struct dhd_bus *bus);
 
@@ -144,6 +158,7 @@ extern uint8 dhd_bus_is_ioready(struct dhd_bus *bus);
 extern int dhd_bus_reg_sdio_notify(void* semaphore);
 extern void dhd_bus_unreg_sdio_notify(void);
 extern void dhd_txglom_enable(dhd_pub_t *dhdp, bool enable);
+extern int dhd_set_bus_params(struct dhd_bus *bus); /* expose set bus params for callers */
 extern int dhd_bus_get_ids(struct dhd_bus *bus, uint32 *bus_type, uint32 *bus_num,
 	uint32 *slot_num);
 

@@ -66,7 +66,7 @@ CONFIG_MACH_PLATFORM := y
 LINUXDIR  = /lib/modules/$(shell uname -r)/build
 PWD = $(shell pwd)
 KVER = $(shell uname -r)
-MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/
+MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/bcmdhd/
 ARCH = arm64
 
 CONFIG_BCMDHD_FW_PATH="/lib/firmware/ap6275p/fw_bcmdhd.bin"
@@ -96,7 +96,7 @@ DHDOFILES = aiutils.o siutils.o sbutils.o                                 \
 	dhd_debug_linux.o dhd_debug.o dhd_mschdbg.o dhd_dbg_ring.o            \
 	hnd_pktq.o hnd_pktpool.o linux_pkt.o frag.o                           \
 	dhd_linux_exportfs.o dhd_linux_pktdump.o dhd_mschdbg.o linuxerrmap.o  \
-	dhd_linux_tx.o dhd_linux_rx.o fwpkg_utils.o                           \
+	dhd_linux_tx.o dhd_linux_rx.o fwpkg_utils.o dhd_bus_stubs.o                          \
 	dhd_config.o dhd_ccode.o wl_event.o wl_android_ext.o                  \
 	wl_iapsta.o wl_escan.o wl_timer.o
 
@@ -434,7 +434,7 @@ ifeq ($(CONFIG_BCMDHD_DTS),y)
 endif
 	DHDCFLAGS += -DCUSTOMER_HW -DDHD_OF_SUPPORT
 ifeq ($(CONFIG_RFKILL_RK),y)
-	DHDCFLAGS += -DCUSTOMER_HW_ROCKCHIP
+	# Rockchip specific CUSTOMER_HW_ROCKCHIP flag removed for mainline compatibility
 endif
 	DHDCFLAGS += -DBCM_USE_PLATFORM_STRLCPY
 #	DHDCFLAGS += -DGET_CUSTOM_MAC_ENABLE

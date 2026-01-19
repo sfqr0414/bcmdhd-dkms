@@ -38,6 +38,9 @@
 
 #include <linux/init.h>
 #include <linux/kernel.h>
+
+#pragma GCC diagnostic push
+
 #include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>

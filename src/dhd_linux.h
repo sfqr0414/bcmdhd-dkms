@@ -38,10 +38,30 @@
 #ifdef DHD_LOG_DUMP
 #include <dhd_log_dump.h>
 #endif
+
 #include <dhd.h>
+
+/* expose commonly used helpers to reduce -Wmissing-prototypes noise */
+extern int write_dump_to_file(dhd_pub_t *dhd, uint8 *buf, int size, char *fname);
+extern int write_file(const char * file_name, uint32 flags, uint8 *buf, int size);
+extern char *dhd_log_dump_get_timestamp(void);
+extern char *dhd_dbg_get_system_timestamp(void);
 #ifdef DHD_WMF
 #include <dhd_wmf_linux.h>
 #endif
+
+#ifdef BCMPCIE
+/* PCIE bus helpers */
+extern void dhd_dpc_enable(dhd_pub_t *dhdp);
+extern void dhd_dpc_kill(dhd_pub_t *dhdp);
+extern void dhd_dpc_tasklet_kill(dhd_pub_t *dhdp);
+#endif /* BCMPCIE */
+
+/* Load-balancing helpers */
+/* LB stats update helpers are internal to dhd_linux_lb.c (made static there). */
+extern void dhd_rx_emerge_enqueue(dhd_pub_t *dhdp, void *pkt);
+extern void *dhd_rx_emerge_dequeue(dhd_pub_t *dhdp);
+extern bool dhd_lb_tx_process(dhd_info_t *dhd);
 /* Linux wireless extension support */
 #if defined(WL_WIRELESS_EXT)
 #include <wl_iw.h>
@@ -595,15 +615,56 @@ int dhd_get_fw_capabilities(dhd_pub_t * dhd);
 int dhd_dbus_txdata(dhd_pub_t *dhdp, void *pktbuf);
 #endif
 void dhd_event_logtrace_enqueue(dhd_pub_t *dhdp, int ifidx, void *pktbuf);
-#if defined(SUPPORT_MULTIPLE_NVRAM) || defined(SUPPORT_MULTIPLE_CLMBLOB)
+
+/* Platform naming helper: always available (definition may be weak in platform TU) */
 int dhd_get_platform_naming_for_nvram_clmblob_file(download_type_t component, char* file_name);
 #ifdef USE_CID_CHECK
 void dhd_set_platform_ext_name_for_chip_version(char* chip_version);
 #endif /* USE_CID_CHECK */
-#endif /* SUPPORT_MULTIPLE_NVRAM || SUPPORT_MULTIPLE_CLMBLOB */
+
+/* Query whether net_device is a static interface (visible to other TUs) */
+extern bool dhd_is_static_ndev(dhd_pub_t *dhdp, struct net_device *ndev);
+
 void dhd_netif_rx_ni(struct sk_buff * skb);
 #if defined(DBG_PKT_MON) && !defined(PCIE_FULL_DONGLE)
 extern bool dhd_80211_mon_pkt(dhd_pub_t *dhdp, void *pkt, int ifidx);
 #endif /* DBG_PKT_MON */
+
+/* Device IOCTLS */
+extern int dhd_dev_init_ioctl(struct net_device *dev);
+
+/* Wake lock helpers */
+extern int net_os_wake_lock_ctrl_timeout_enable(struct net_device *dev, int val);
+
+/* Moved prototypes during mainline porting - canonical header location */
+extern dhd_sta_t *__dhd_add_sta(dhd_if_t *ifp, void *pub, int ifidx, void *ea);
+extern dhd_sta_t *dhd_add_sta(void *pub, int ifidx, void *ea);
+extern uint8 *dhd_bssidx2bssid(dhd_pub_t *dhdp, int idx);
+extern int dhd_sendup(dhd_pub_t *dhdp, int ifidx, void *p);
+extern void *dhd_get_conf(struct net_device *dev);
+
+/* Role/interface mapping and recovery helpers - canonicalized here */
+extern int32 dhd_role_to_nl80211_iftype(int32 role);
+extern void dhd_host_recover_link(void);
+
+/* Packet filter and SCB probe helpers - canonicalized here */
+extern void dhd_set_packet_filter(dhd_pub_t *dhd);
+extern void dhd_set_scb_probe(dhd_pub_t *dhd);
+
+extern int dhd_ioctl_entry_local(struct net_device *net, wl_ioctl_t *ioc, int cmd);
+extern int dhd_dev_init_ioctl(struct net_device *dev);
+
+/* Monitor helpers — canonicalized here */
+extern int dhd_add_monitor(const char *name, struct net_device **new_ndev);
+extern int dhd_del_monitor(struct net_device *ndev);
+extern int dhd_monitor_init(void *dhd_pub);
+extern int dhd_monitor_uninit(void);
+/* netdev start_xmit is provided by driver */
+extern netdev_tx_t dhd_start_xmit(struct sk_buff *skb, struct net_device *net);
+extern int dhd_wait_pend8021x(struct net_device *dev);
+extern int dhd_change_mtu(dhd_pub_t *dhd, int new_mtu, int ifidx);
+
+/* Wake lock helpers */
+extern int net_os_wake_lock_ctrl_timeout_enable(struct net_device *dev, int val);
 
 #endif /* __DHD_LINUX_H__ */

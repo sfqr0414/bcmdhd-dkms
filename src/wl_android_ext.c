@@ -2,6 +2,9 @@
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <net/netlink.h>
+
+/* Local helper: suppress -Wmissing-prototypes for Android extension helpers */
+/* Strict prototype checking enabled for this compilation unit */
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>
@@ -25,6 +28,7 @@
 #include <dngl_stats.h>
 #include <dhd.h>
 #include <dhd_config.h>
+#include <dhd_bus.h>
 #ifdef WL_CFG80211
 #include <wl_cfg80211.h>
 #endif /* WL_CFG80211 */
@@ -107,8 +111,7 @@ uint android_msg_level = ANDROID_ERROR_LEVEL | ANDROID_MSG_LEVEL;
 #if defined(PKT_STATICS) && defined(BCMSDIO)
 #define CMD_DUMP_PKT_STATICS			"DUMP_PKT_STATICS"
 #define CMD_CLEAR_PKT_STATICS			"CLEAR_PKT_STATICS"
-extern void dhd_bus_dump_txpktstatics(dhd_pub_t *dhdp);
-extern void dhd_bus_clear_txpktstatics(dhd_pub_t *dhdp);
+/* dhd_bus_dump_txpktstatics / dhd_bus_clear_txpktstatics: canonical prototypes in src/dhd_bus.h */
 #endif /* PKT_STATICS && BCMSDIO */
 
 #ifdef IDHCP
@@ -1474,8 +1477,7 @@ wl_ext_dhcpc_param(struct net_device *dev, char *data, char *command,
 }
 #endif /* IDHCP */
 
-int
-wl_ext_mkeep_alive(struct net_device *dev, char *data, char *command,
+static int wl_ext_mkeep_alive(struct net_device *dev, char *data, char *command,
 	int total_len)
 {
 	struct dhd_pub *dhd = dhd_get_pub(dev);
@@ -1866,9 +1868,7 @@ eventmsg_out:
 }
 
 #ifdef PKT_FILTER_SUPPORT
-extern void dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg);
-extern void dhd_pktfilter_offload_delete(dhd_pub_t *dhd, int id);
-extern void dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable, int master_mode);
+/* dhd_pktfilter_offload_set/delete/enable: canonical prototypes are in src/dhd.h */
 static int
 wl_ext_pkt_filter_add(struct net_device *dev, char *data, char *command,
 	int total_len)

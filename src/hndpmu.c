@@ -34,6 +34,9 @@
  */
 
 #include <typedefs.h>
+
+/* Suppress missing-prototypes for platform support code */
+/* Strict prototype checking enabled for this compilation unit */
 #include <bcmdefs.h>
 #include <osl.h>
 #include <bcmutils.h>
@@ -68,6 +71,11 @@
 #include <lpflags.h>
 
 #include "siutils_priv.h"
+
+/* Prototypes for posttrap PMU callbacks to satisfy -Wmissing-prototypes */
+uint32 si_pmu_chipcontrol(si_t *sih, uint reg, uint32 mask, uint32 val);
+uint32 si_pmu_vreg_control(si_t *sih, uint reg, uint32 mask, uint32 val);
+uint32 si_pmu_pllcontrol(si_t *sih, uint reg, uint32 mask, uint32 val);
 
 #ifdef BCM_AVS
 #include <bcm_avs.h>

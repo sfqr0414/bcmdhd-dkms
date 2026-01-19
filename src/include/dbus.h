@@ -316,24 +316,30 @@ typedef struct dbus_pub {
  *  For NDIS60, param2 is WdfDevice
  * Under Linux, param1 and param2 are NULL;
  */
-//extern int dbus_register(int vid, int pid, probe_cb_t prcb, disconnect_cb_t discb, void *prarg,
-//	void *param1, void *param2);
-//extern int dbus_deregister(void);
+/* Registration APIs */
+extern int dbus_register(int vid, int pid, probe_cb_t prcb, disconnect_cb_t discb, void *prarg,
+	void *param1, void *param2);
+extern int dbus_deregister(void);
 
-//extern int dbus_download_firmware(dbus_pub_t *pub);
-//extern int dbus_up(struct dhd_bus *pub);
+/* Forward declare dhd_bus to avoid pulling platform headers here */
+struct dhd_bus;
+typedef struct dhd_bus dhd_bus_t;
+
+/* Basic control and firmware */
+extern struct dhd_bus *dbus_attach(osl_t *osh, int rxsize, int nrxq, int ntxq,
+	dhd_pub_t *pub, dbus_callbacks_t *cbs, dbus_extdl_t *extdl, struct shared_info *sh);
+extern int dbus_dlneeded(dhd_bus_t *pub);
+extern int dbus_download_firmware(struct dhd_bus *pub);
+extern int dbus_up(struct dhd_bus *pub);
+extern int dbus_stop(struct dhd_bus *pub);
+extern int dbus_recv_bulk(dbus_pub_t *pub, uint32 ep_idx);
+extern int dbus_get_attrib(struct dhd_bus *pub, dbus_attrib_t *attrib);
+
 extern int dbus_down(dbus_pub_t *pub);
-//extern int dbus_stop(struct dhd_bus *pub);
 extern int dbus_shutdown(dbus_pub_t *pub);
 extern void dbus_flowctrl_rx(dbus_pub_t *pub, bool on);
 
-//extern int dbus_send_txdata(dbus_pub_t *dbus, void *pktbuf);
 extern int dbus_send_buf(dbus_pub_t *pub, uint8 *buf, int len, void *info);
-//extern int dbus_send_pkt(dbus_pub_t *pub, void *pkt, void *info);
-//extern int dbus_send_ctl(struct dhd_bus *pub, uint8 *buf, int len);
-//extern int dbus_recv_ctl(struct dhd_bus *pub, uint8 *buf, int len);
-//extern int dbus_recv_bulk(dbus_pub_t *pub, uint32 ep_idx);
-//extern int dbus_poll_intr(dbus_pub_t *pub);
 extern int dbus_get_stats(dbus_pub_t *pub, dbus_stats_t *stats);
 extern int dbus_get_device_speed(dbus_pub_t *pub);
 extern int dbus_set_config(dbus_pub_t *pub, dbus_config_t *config);

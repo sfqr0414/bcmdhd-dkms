@@ -31,6 +31,7 @@
 #include <dngl_stats.h>
 #include <dhd.h>
 #include <dhd_proto.h>
+#include <dhd_bus.h>
 #ifdef PROP_TXSTATUS /* a form of flow control between host and dongle */
 #include <dhd_wlfc.h>
 #endif
@@ -1509,8 +1510,7 @@ static dbus_driver_t dhd_dbus = {
  * As part of initialization, higher level (eg dhd_linux.c) requests DBUS to prepare for
  * action.
  */
-int
-dhd_bus_register(void)
+int dhd_bus_register(void)
 {
 	int err;
 
@@ -1527,8 +1527,7 @@ dhd_bus_register(void)
 
 dhd_pub_t *g_pub = NULL;
 bool net_attached = FALSE;
-void
-dhd_bus_unregister(void)
+void dhd_bus_unregister(void)
 {
 	DBUSTRACE(("%s\n", __FUNCTION__));
 
@@ -2170,7 +2169,7 @@ dbus_pnp_disconnect(dbus_pub_t *pub)
 
 int
 dhd_bus_iovar_op(dhd_pub_t *dhdp, const char *name,
-	void *params, int plen, void *arg, int len, bool set)
+	void *params, uint plen, void *arg, uint len, bool set)
 {
 	dhd_bus_t *dhd_bus = (dhd_bus_t *) dhdp->bus;
 	int err = DBUS_ERR;

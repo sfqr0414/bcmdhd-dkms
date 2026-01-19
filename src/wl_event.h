@@ -15,4 +15,10 @@ int wl_ext_event_register(struct net_device *dev, dhd_pub_t *dhd,
 void wl_ext_event_deregister(struct net_device *dev, dhd_pub_t *dhd,
 	uint32 event, void *cb_func);
 void wl_ext_event_send(void *params, const wl_event_msg_t * e, void *data);
+
+/* Canonical WL helpers - expose prototypes to avoid TU-only missing prototypes */
+extern uint wl_get_port_num(wl_io_pport_t *io_pport);
+extern int wl_event_process_default(wl_event_msg_t *event, struct wl_evt_pport *evt_pport);
+extern int wl_event_process(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
+	uint pktlen, void **data_ptr, void *raw_event);
 #endif

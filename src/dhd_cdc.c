@@ -55,34 +55,23 @@
 #endif /* BCMDBUS */
 
 #define RETRIES 2		/* # of retries to retrieve matching ioctl response */
-#define BUS_HEADER_LEN	(24+DHD_SDALIGN)	/* Must be at least SDPCM_RESERVE
-				 * defined in dhd_sdio.c (amount of header tha might be added)
+#ifndef BUS_HEADER_LEN
+#define BUS_HEADER_LEN	(24+DHD_SDALIGN) 	/* Must be at least SDPCM_RESERVE
+				 * defined in dhd_sdio.c (amount of header that might be added)
 				 * plus any space that might be needed for alignment padding.
 				 */
+#endif
+#ifndef ROUND_UP_MARGIN
 #define ROUND_UP_MARGIN	2048	/* Biggest SDIO block size possible for
 				 * round off at the end of buffer
 				 */
+#endif
 
 /* This value is from Legacy chipsets */
 #define DEFAULT_WLC_API_VERSION_MAJOR	3
 #define DEFAULT_WLC_API_VERSION_MINOR	0
 
-typedef struct dhd_prot {
-	uint16 reqid;
-	uint8 pending;
-	uint32 lastcmd;
-	uint8 bus_header[BUS_HEADER_LEN];
-	cdc_ioctl_t msg;
-	unsigned char buf[WLC_IOCTL_MAXLEN + ROUND_UP_MARGIN];
-} dhd_prot_t;
-
-uint16
-dhd_prot_get_ioctl_trans_id(dhd_pub_t *dhdp)
-{
-	/* SDIO does not have ioctl_trans_id yet, so return -1 */
-	return -1;
-}
-
+/* dhd_prot_t defined in dhd_proto.h */
 static int
 dhdcdc_msg(dhd_pub_t *dhd)
 {

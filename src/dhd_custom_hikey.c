@@ -43,8 +43,7 @@
 #include <dhd.h>
 
 #ifdef CONFIG_BROADCOM_WIFI_RESERVED_MEM
-extern int dhd_init_wlan_mem(void);
-extern void *dhd_wlan_mem_prealloc(int section, unsigned long size);
+/* dhd_init_wlan_mem / dhd_wlan_mem_prealloc canonical prototypes are in src/dhd.h */
 #endif /* CONFIG_BROADCOM_WIFI_RESERVED_MEM */
 
 #define HIKEY_PCIE_VENDOR_ID 0x19e5

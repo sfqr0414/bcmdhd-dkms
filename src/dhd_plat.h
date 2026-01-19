@@ -99,5 +99,10 @@ extern uint32 dhd_plat_get_rc_vendor_id(void);
 extern uint32 dhd_plat_get_rc_device_id(void);
 
 extern uint16 dhd_plat_align_rxbuf_size(uint16 rxbufpost_sz);
+
+/* WLAN platform initialization hooks (exposed for platform adapters) */
+extern int dhd_wlan_init_plat_data(wifi_adapter_info_t *adapter);
+extern void dhd_wlan_deinit_plat_data(wifi_adapter_info_t *adapter);
+
 #endif /* __linux__ */
 #endif /* __DHD_PLAT_H__ */

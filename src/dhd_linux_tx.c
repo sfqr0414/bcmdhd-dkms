@@ -38,6 +38,8 @@
 
 #include <linux/init.h>
 #include <linux/kernel.h>
+
+
 #include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
@@ -87,6 +89,7 @@
 #include <dhd.h>
 #include <dhd_linux.h>
 #include <dhd_linux_pktdump.h>
+#include <dhd_linux_tx.h>
 #ifdef DHD_WET
 #include <dhd_wet.h>
 #endif /* DHD_WET */

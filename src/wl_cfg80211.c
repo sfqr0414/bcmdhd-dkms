@@ -25,6 +25,8 @@
 #include <linuxver.h>
 #include <linux/kernel.h>
 
+/* Strict prototype checking enabled for this compilation unit */
+
 #include <bcmutils.h>
 #include <bcmstdlib_s.h>
 #include <bcmwifi_channels.h>
@@ -591,7 +593,7 @@ static int wl_cfg80211_is_wfa_cap_ie(wlcfg_assoc_info_t *info, struct bcm_cfg802
 /*
  * cfg80211_ops api/callback list
  */
-static s32 wl_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed);
+static s32 wl_cfg80211_set_wiphy_params(struct wiphy *wiphy, int radio_idx, u32 changed);
 #ifdef WLAIBSS_MCHAN
 static bcm_struct_cfgdev* bcm_cfg80211_add_ibss_if(struct wiphy *wiphy, char *name);
 static s32 bcm_cfg80211_del_ibss_if(struct wiphy *wiphy, bcm_struct_cfgdev *cfgdev);
@@ -620,25 +622,9 @@ static int wl_cfg80211_update_connect_params(struct wiphy *wiphy, struct net_dev
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) */
 static s32 wl_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 	u16 reason_code);
-#if defined(WL_CFG80211_P2P_DEV_IF)
-static s32
-wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
-	enum nl80211_tx_power_setting type, s32 mbm);
-#else
-static s32
-wl_cfg80211_set_tx_power(struct wiphy *wiphy,
-	enum nl80211_tx_power_setting type, s32 dbm);
-#endif /* WL_CFG80211_P2P_DEV_IF */
-#if defined(WL_CFG80211_P2P_DEV_IF)
-static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy,
-	struct wireless_dev *wdev,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-	unsigned int link_id,
-#endif
-	s32 *dbm);
-#else
-static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, s32 *dbm);
-#endif /* WL_CFG80211_P2P_DEV_IF */
+static s32 wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
+	int link_id, enum nl80211_tx_power_setting type, s32 dbm);
+static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev, int unused, unsigned int link_id, s32 *dbm);
 static s32 wl_cfg80211_config_default_key(struct wiphy *wiphy,
 	struct net_device *dev,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0) || defined(CFG80211_BKPORT_MLO)
@@ -960,14 +946,7 @@ static __used u32 wl_find_msb(u16 bit16);
 static int wl_setup_rfkill(struct bcm_cfg80211 *cfg, bool setup);
 static int wl_rfkill_set(void *data, bool blocked);
 
-/*
- * Some external functions, TODO: move them to dhd_linux.h
- */
-int dhd_add_monitor(const char *name, struct net_device **new_ndev);
-int dhd_del_monitor(struct net_device *ndev);
-int dhd_monitor_init(void *dhd_pub);
-int dhd_monitor_uninit(void);
-netdev_tx_t dhd_start_xmit(struct sk_buff *skb, struct net_device *net);
+/* Monitor helpers — canonical prototypes moved to src/dhd_linux.h */
 
 #ifdef ROAM_CHANNEL_CACHE
 int init_roam_cache(struct bcm_cfg80211 *cfg, int ioctl_ver);
@@ -1115,7 +1094,7 @@ static int wl_cfg80211_get_nan_instant_chan(struct bcm_cfg80211 *cfg,
 	cfg->eidx.event_type = type; }
 #define WL_CLR_EIDX_STATES(cfg)	\
 	cfg->eidx.in_progress = WL_EIDX_INVALID;
-extern int dhd_wait_pend8021x(struct net_device *dev);
+/* dhd_wait_pend8021x: canonical prototype moved to src/dhd_linux.h */
 #ifdef PROP_TXSTATUS_VSDB
 extern int disable_proptx;
 #endif /* PROP_TXSTATUS_VSDB */
@@ -1583,7 +1562,7 @@ int wl_channel_to_frequency(u32 chan, chanspec_band_t band)
 	return 0; /* not supported */
 }
 
-int
+static int
 wl_get_sideband_num(chanspec_bw_t bw)
 {
 	int sb_cnt;
@@ -3409,12 +3388,14 @@ static s32 wl_set_retry(struct net_device *dev, u32 retry, bool l)
 	return err;
 }
 
-static s32 wl_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
+static s32 wl_cfg80211_set_wiphy_params(struct wiphy *wiphy, int radio_idx, u32 changed)
 {
+	/* radio_idx is currently unused; present for kernel compatibility */
 	struct bcm_cfg80211 *cfg = (struct bcm_cfg80211 *)wiphy_priv(wiphy);
 	struct net_device *ndev = bcmcfg_to_prmry_ndev(cfg);
 	s32 err = 0;
 
+	(void)radio_idx;
 	RETURN_EIO_IF_NOT_UP(cfg);
 	WL_DBG(("Enter\n"));
 	if (changed & WIPHY_PARAM_RTS_THRESHOLD &&
@@ -3639,7 +3620,7 @@ fail:
 }
 #endif /* WLAIBSS_MCHAN */
 
-s32
+static s32
 wl_cfg80211_to_fw_iftype(wl_iftype_t iftype)
 {
 	s32 ret = BCME_ERROR;
@@ -5517,8 +5498,7 @@ exit:
 #endif /* MFP */
 
 #ifdef WL_FILS
-bool
-wl_is_fils_supported(struct net_device *ndev)
+static bool wl_is_fils_supported(struct net_device *ndev)
 {
 	s32 err;
 	u8 ioctl_buf[WLC_IOCTL_SMLEN] = {0};
@@ -6102,7 +6082,7 @@ static bool wl_get_chan_isvht80(struct net_device *net, dhd_pub_t *dhd)
 }
 #endif /* CUSTOM_SET_CPUCORE || CONFIG_TCPACK_FASTTX */
 
-int wl_cfg80211_cleanup_mismatch_status(struct net_device *dev, struct bcm_cfg80211 *cfg,
+static int wl_cfg80211_cleanup_mismatch_status(struct net_device *dev, struct bcm_cfg80211 *cfg,
 	bool disassociate)
 {
 	scb_val_t scbval;
@@ -6319,8 +6299,7 @@ wl_config_roam_env_detection(struct bcm_cfg80211 *cfg, struct net_device *dev)
 }
 #endif /* ROAM_ENABLE && ROAMENV_DETECTION */
 
-s32
-wl_do_preassoc_ops(struct bcm_cfg80211 *cfg,
+static s32 wl_do_preassoc_ops(struct bcm_cfg80211 *cfg,
 		struct net_device *dev, struct cfg80211_connect_params *sme)
 {
 #if defined(BCMDONGLEHOST)
@@ -7099,8 +7078,7 @@ wl_pkt_mon_start(struct bcm_cfg80211 *cfg, struct net_device *dev)
 }
 #endif /* DBG_PKT_MON && BCMDONGLEHOST */
 
-void
-wl_conn_debug_info(struct bcm_cfg80211 *cfg, struct net_device *dev, wlcfg_assoc_info_t *info)
+static void wl_conn_debug_info(struct bcm_cfg80211 *cfg, struct net_device *dev, wlcfg_assoc_info_t *info)
 {
 	struct wl_security *sec = wl_read_prof(cfg, dev, WL_PROF_SEC);
 	char sec_info[64];
@@ -7617,25 +7595,18 @@ exit:
 	return err;
 }
 
-static s32
-#if defined(WL_CFG80211_P2P_DEV_IF)
-wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
-	enum nl80211_tx_power_setting type, s32 mbm)
-#else
-wl_cfg80211_set_tx_power(struct wiphy *wiphy,
-	enum nl80211_tx_power_setting type, s32 dbm)
-#endif /* WL_CFG80211_P2P_DEV_IF */
+static s32 wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
+	int link_id, enum nl80211_tx_power_setting type, s32 dbm)
 {
-
+	/* link_id/wdev may be unused on some kernel versions */
 	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
 	struct net_device *ndev = bcmcfg_to_prmry_ndev(cfg);
 	s32 err = 0;
-#if defined(WL_CFG80211_P2P_DEV_IF)
-	s32 dbm = MBM_TO_DBM(mbm);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)) || \
-	defined(WL_COMPAT_WIRELESS) || defined(WL_SUPPORT_BACKPORTED_KPATCHES)
+
+	(void)link_id;
+	(void)wdev;
+	/* Normalize dbm in case it's passed as mBm by backported kernels */
 	dbm = MBM_TO_DBM(dbm);
-#endif /* WL_CFG80211_P2P_DEV_IF */
 
 	RETURN_EIO_IF_NOT_UP(cfg);
 	switch (type) {
@@ -7666,21 +7637,15 @@ wl_cfg80211_set_tx_power(struct wiphy *wiphy,
 	return err;
 }
 
-static s32
-#if defined(WL_CFG80211_P2P_DEV_IF)
-wl_cfg80211_get_tx_power(struct wiphy *wiphy,
-	struct wireless_dev *wdev,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-	unsigned int link_id,
-#endif
-	s32 *dbm)
-#else
-wl_cfg80211_get_tx_power(struct wiphy *wiphy, s32 *dbm)
-#endif /* WL_CFG80211_P2P_DEV_IF */
+static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev, int unused, unsigned int link_id, s32 *dbm)
 {
 	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
 	struct net_device *ndev = bcmcfg_to_prmry_ndev(cfg);
 	s32 err = 0;
+
+	(void)wdev;
+	(void)unused;
+	(void)link_id;
 
 	RETURN_EIO_IF_NOT_UP(cfg);
 	err = wl_get_tx_power(ndev, dbm);
@@ -9436,8 +9401,7 @@ exit:
 #endif /* !OEM_ANDROID */
 
 #ifdef OEM_ANDROID
-void
-wl_apply_per_sta_static_settings(struct bcm_cfg80211 *cfg,
+static void wl_apply_per_sta_static_settings(struct bcm_cfg80211 *cfg,
 		struct net_device *dev, bool suspend)
 {
 	/*
@@ -9737,8 +9701,7 @@ wl_apply_per_sta_conn_suspend_settings(struct bcm_cfg80211 *cfg,
 	return BCME_OK;
 }
 
-void
-wl_apply_sta_role_settings(struct bcm_cfg80211 *cfg, bool suspend)
+static void wl_apply_sta_role_settings(struct bcm_cfg80211 *cfg, bool suspend)
 {
 	struct net_info *iter, *next;
 
@@ -11399,8 +11362,7 @@ wl_cfg80211_change_bss(struct wiphy *wiphy,
 	return err;
 }
 
-void
-wl_init_listen_timer(struct bcm_cfg80211 *cfg)
+static void wl_init_listen_timer(struct bcm_cfg80211 *cfg)
 {
 	if (cfg->p2p) {
 		init_timer_compat(&cfg->p2p->listen_timer, wl_cfgp2p_listen_expired, cfg);
@@ -12041,13 +12003,13 @@ static struct cfg80211_ops wl_cfg80211_ops = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0))
 	.abort_scan = wl_cfg80211_abort_scan,
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) */
-	.set_wiphy_params = wl_cfg80211_set_wiphy_params,
+	.set_wiphy_params = (int (*)(struct wiphy *, int, u32))wl_cfg80211_set_wiphy_params,
 	.join_ibss = wl_cfg80211_join_ibss,
 	.leave_ibss = wl_cfg80211_leave_ibss,
 	.get_station = wl_cfg80211_get_station,
 	.dump_station = wl_cfg80211_dump_station,
-	.set_tx_power = wl_cfg80211_set_tx_power,
-	.get_tx_power = wl_cfg80211_get_tx_power,
+	.set_tx_power = (int (*)(struct wiphy *, struct wireless_dev *, int, enum nl80211_tx_power_setting, int))wl_cfg80211_set_tx_power,
+	.get_tx_power = (int (*)(struct wiphy *, struct wireless_dev *, int, unsigned int, int *))wl_cfg80211_get_tx_power,
 	.add_key = wl_cfg80211_add_key,
 	.del_key = wl_cfg80211_del_key,
 	.get_key = wl_cfg80211_get_key,
@@ -12216,8 +12178,7 @@ wl_is_ccode_change_required(struct net_device *net,
 }
 #endif
 
-void
-wl_cfg80211_cleanup_connection(struct net_device *net, bool user_enforced)
+static void wl_cfg80211_cleanup_connection(struct net_device *net, bool user_enforced)
 {
 	s32 ret = BCME_OK;
 	struct wireless_dev *wdev = ndev_to_wdev(net);
@@ -13959,7 +13920,7 @@ wl_cache_assoc_resp_ies(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	}
 }
 
-char *
+static char *
 wl_get_link_action_str(u16 link_action)
 {
 	switch (link_action) {
@@ -13980,7 +13941,7 @@ wl_get_link_action_str(u16 link_action)
 	}
 }
 
-char *
+static char *
 wl_get_assoc_state_str(u16 assoc_state)
 {
 	switch (assoc_state) {

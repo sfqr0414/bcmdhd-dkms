@@ -262,9 +262,18 @@ extern void bcmsdh_dev_pm_stay_awake(bcmsdh_info_t *sdh);
 extern void bcmsdh_dev_relax(bcmsdh_info_t *sdh);
 extern bool bcmsdh_dev_pm_enabled(bcmsdh_info_t *sdh);
 
+/* Additional helper prototypes (moved for canonical visibility) */
+/* Use the canonical bcmsdh_info_t type for the OOB helper */
+extern void bcmsdh_enable_hw_oob_intr(bcmsdh_info_t *sdh, bool enable);
+extern void *bcmsdh_get_sdioh(bcmsdh_info_t *sdh);
+extern int bcmsdh_register_client_driver(void);
+extern void bcmsdh_unregister_client_driver(void);
+extern void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint bus_type,
+	uint bus_num, uint slot_num);
+extern int bcmsdh_remove(bcmsdh_info_t *bcmsdh);
+
 int bcmsdh_suspend(bcmsdh_info_t *bcmsdh);
 int bcmsdh_resume(bcmsdh_info_t *bcmsdh);
-
 /* Function to pass device-status bits to DHD. */
 extern uint32 bcmsdh_get_dstatus(void *sdh);
 

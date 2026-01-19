@@ -26,6 +26,8 @@
 #include <osl.h>
 #include <linux/kernel.h>
 
+/* Strict prototype checking enabled for this compilation unit */
+
 #include <bcmutils.h>
 #include <bcmstdlib_s.h>
 #include <bcmwifi_channels.h>

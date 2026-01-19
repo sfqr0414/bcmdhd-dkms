@@ -33,6 +33,9 @@
 #ifndef _dhd_h_
 #define _dhd_h_
 
+/* Forward declare dhd_info for use in prototypes referenced early in this header */
+typedef struct dhd_info dhd_info_t;
+
 #if defined(LINUX)
 #include <linux/firmware.h>
 #include <linux/init.h>
@@ -138,9 +141,19 @@ struct dhd_info;
 struct dhd_ioctl;
 struct dhd_dbg;
 struct dhd_ts;
+/* Forward declare dhd_pub_t so early prototypes that reference it compile */
+typedef struct dhd_pub dhd_pub_t;
 #ifdef DNGL_AXI_ERROR_LOGGING
 struct dhd_axi_error_dump;
 #endif /* DNGL_AXI_ERROR_LOGGING */
+
+/* Additional helpers moved to canonical header during porting */
+extern int dhd_create_ecounters_params(dhd_pub_t *dhd, uint16 type, uint16 if_slice_idx,
+	uint16 stats_rep, uint8 **xtlv);
+extern int pattern_atoh_len(char *src, char *dst, int len);
+/* Platform helper: weak implementation may live in platform TU */
+extern char *dhd_get_device_dt_name(void);
+
 
 /* The level of bus communication with the dongle */
 enum dhd_bus_state {
@@ -2979,6 +2992,11 @@ void dhd_sendup_info_buf(dhd_pub_t *dhdp, uint8 *msg);
 #if defined(WIFI_TURNON_USE_HALINIT)
 extern int dhd_open(struct net_device *net);
 #endif /* WIFI_TURNON_USE_HALINIT */
+
+/* Canonical prototypes added to reduce -Wmissing-prototypes warnings */
+/* wl_get_port_num and wl_event_* use WL-specific types; keep their prototypes in WL headers */
+extern int dhd_flow_ring_debug(dhd_pub_t *dhd, char *msg, uint msglen);
+extern int dhd_check_current_clm_data(dhd_pub_t *dhd);
 #if defined(LINUX) || defined(linux)
 extern int dhd_stop(struct net_device *net);
 #endif /* LINUX */
@@ -3939,6 +3957,19 @@ int dhd_download_blob(dhd_pub_t *dhd, unsigned char *buf,
 int dhd_download_blob_cached(dhd_pub_t *dhd, char *file_path,
 	uint32 len, char *iovar);
 
+/* Download helper used by various transport layers */
+int dhd_download_2_dongle(dhd_pub_t *dhd, char *iovar, uint16 flag, uint16 dload_type,
+	unsigned char *dload_buf, int len);
+
+/* Memory preallocation helper (canonical prototype)
+ * Matches signature in src/dhd_static_buf.c guarded by macros.
+ */
+void *dhd_wlan_mem_prealloc(
+#if defined(BCMDHD_MDRIVER) && !defined(DHD_STATIC_IN_DRIVER)
+	uint bus_type, int index,
+#endif
+	int section, unsigned long size);
+
 int dhd_apply_default_txcap(dhd_pub_t *dhd, char *txcap_path);
 int dhd_apply_default_clm(dhd_pub_t *dhd, char *clm_path);
 
@@ -4450,6 +4481,21 @@ extern void dhd_cleanup_if(struct net_device *net);
 void dhd_schedule_logtrace(void *dhd_info);
 int dhd_print_fw_ver_from_file(dhd_pub_t *dhdp, char *fwpath);
 
+/* Logtrace control helpers */
+extern void dhd_cancel_logtrace_process_sync(dhd_info_t *dhd);
+extern int dhd_init_logtrace_process(dhd_info_t *dhd);
+extern int dhd_reinit_logtrace_process(dhd_info_t *dhd);
+extern void dhd_event_logtrace_flush_queue(dhd_pub_t *dhdp);
+
+/* DPC / histos helpers */
+extern void dhd_init_dpc_histos(dhd_pub_t *dhd);
+extern void dhd_deinit_dpc_histos(dhd_pub_t *dhd);
+extern void dhd_dump_dpc_histos(dhd_pub_t *dhd, struct bcmstrbuf *strbuf);
+extern void dhd_clear_dpc_histos(dhd_pub_t *dhd);
+
+/* Interrupt dump helpers */
+extern void dhd_dump_intr_counters(dhd_pub_t *dhd, struct bcmstrbuf *strbuf);
+extern void dhd_dump_intr_registers(dhd_pub_t *dhd, struct bcmstrbuf *strbuf);
 #if defined(LINUX) || defined(linux)
 /* configuration of ecounters. API's tp start/stop. currently supported only for linux */
 extern int dhd_ecounter_configure(dhd_pub_t *dhd, bool enable);
@@ -4532,6 +4578,11 @@ typedef wlc_sroam_info_v1_t wlc_sroam_info_t;
 #endif /* DHD_DUMP_FILE_WRITE_FROM_KERNEL */
 
 void dhd_bus_counters(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf);
+
+/* Protocol and bus prototypes are defined in their canonical headers
+ * `dhd_proto.h` and `dhd_bus.h` respectively. Small stub translation units
+ * should include those headers instead of relying on duplicated declarations here.
+ */
 
 #define DHD_HISTOGRAM_ENTRIES	(14u)
 #define DHD_HISTOGRAM_SIZE	(sizeof(uint64) * DHD_HISTOGRAM_ENTRIES)
@@ -4679,6 +4730,9 @@ static INLINE struct file *dhd_filp_open(const char *filename, int flags, int mo
 {
 	return filp_open(filename, flags, mode);
 }
+
+/* Forward declare dhd_info for prototypes that appear earlier than its definition */
+/* (moved earlier to top of header to avoid ordering issues) */
 
 static INLINE int dhd_filp_close(void *image, void *id)
 {

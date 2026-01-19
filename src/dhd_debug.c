@@ -1383,7 +1383,7 @@ dhd_dbg_trace_evnt_handler(dhd_pub_t *dhdp, void *event_data,
 /*
  * dhd_dbg_set_event_log_tag : modify the state of an event log tag
  */
-void
+static void
 dhd_dbg_set_event_log_tag(dhd_pub_t *dhdp, uint16 tag, uint8 set_num, uint8 is_set)
 {
 	wl_el_tag_params_t pars;
@@ -2682,7 +2682,7 @@ dhd_dbg_process_tx_status(dhd_pub_t *dhdp, void *pkt,
 	} \
 }
 
-void print_roam_chan_list(char *prefix, uint chan_num, uint16 band_2g,
+static void print_roam_chan_list(char *prefix, uint chan_num, uint16 band_2g,
 	uint16 uni2a, uint8 uni3, uint8 *uni2c)
 {
 	struct bcmstrbuf b;
