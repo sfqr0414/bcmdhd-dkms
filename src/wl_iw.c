@@ -50,6 +50,7 @@
 #include <wl_escan.h>
 #endif
 #include <dhd_config.h>
+#include <dhd_linux.h>
 
 uint iw_msg_level = WL_ERROR_LEVEL;
 
