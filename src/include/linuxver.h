@@ -1018,6 +1018,10 @@ static inline void get_monotonic_boottime(struct timespec *ts)
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)) && (LINUX_VERSION_CODE >= \
 	KERNEL_VERSION(5, 0, 0))
+/* Linux 5.0-5.5: do_gettimeofday() was removed.
+ * Provide compatibility wrapper using ktime_get_real_ts64().
+ * Note: For Linux 5.6+, use osl_do_gettimeofday() from linux_osl.c instead.
+ */
 static inline void do_gettimeofday(struct timeval *tv)
 {
 	struct timespec64 now;
@@ -1071,6 +1075,9 @@ static inline void do_gettimeofday(struct timeval *tv)
 #define netdev_tx_t int
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+/* Linux 5.18+: netif_rx_ni() was removed as netif_rx() became safe for any context.
+ * For compatibility, map netif_rx_ni() calls to netif_rx().
+ */
 #define netif_rx_ni(skb) netif_rx(skb)
 #define pci_free_consistent(a, b, c, d) dma_free_coherent(&((struct pci_dev *)a)->dev, b, c, d)
 #define pci_map_single(a, b, c, d) dma_map_single(&((struct pci_dev *)a)->dev, b, c, d)
@@ -1086,6 +1093,10 @@ static inline void do_gettimeofday(struct timeval *tv)
 #include <bcmstdlib_s.h>
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
+/* Linux 6.7+: strlcpy() was removed in favor of strscpy() which has
+ * different semantics (returns negative on truncation vs. always returning strlen).
+ * For compatibility, map strlcpy() calls to strscpy().
+ */
 #define strlcpy(a, b, c)	strscpy(a, b, c)
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0) */
 #endif /* !defined(FREEBSD) && !defined(MACOSX) && !defined(BCM_USE_PLATFORM_STRLCPY) */

@@ -3716,17 +3716,13 @@ dhd_os_wlfc_unblock(dhd_pub_t *pub)
 void
 dhd_netif_rx_ni(struct sk_buff * skb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-	/* Do not call netif_recieve_skb as this workqueue scheduler is
-	 * not from NAPI Also as we are not in INTR context, do not call
-	 * netif_rx, instead call netif_rx_ni (for kerenl >= 2.6) which
-	 * does netif_rx, disables irq, raise NET_IF_RX softirq and
-	 * enables interrupts back
+	/* Linux 6.x: netif_rx() is safe to call from any context.
+	 * The old netif_rx_ni() function was removed in kernel 5.18.0 as
+	 * netif_rx() became safe to use in non-interrupt context.
+	 * For compatibility, we keep this wrapper function but it now
+	 * simply calls netif_rx() directly.
 	 */
 	netif_rx(skb);
-#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0) */
-	netif_rx(skb);
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0) */
 }
 
 /*  This routine do not support Packet chain feature, Currently tested for
