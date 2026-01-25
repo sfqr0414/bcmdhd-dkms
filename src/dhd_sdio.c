@@ -5927,8 +5927,8 @@ dhdsdio_bus_save_download_info(dhd_bus_t *bus, uint32 download_addr,
 		bus->fw_download_len = download_size;
 	}
 	bus->fw_download_addr = download_addr;
-	strlcpy(bus->fwsig_filename, signature_fname, sizeof(bus->fwsig_filename));
-	strlcpy(bus->bootloader_filename, bloader_fname, sizeof(bus->bootloader_filename));
+	strscpy(bus->fwsig_filename, signature_fname, sizeof(bus->fwsig_filename));
+	strscpy(bus->bootloader_filename, bloader_fname, sizeof(bus->bootloader_filename));
 	bus->bootloader_addr = bloader_download_addr;
 #ifdef GDB_PROXY
 	/* GDB proxy bootloader mode - if signature file specified (i.e.
@@ -11011,7 +11011,7 @@ dhdsdio_download_code_file(struct dhd_bus *bus, char *pfw_path)
 			__FUNCTION__, file_size));
 	} else {
 		file_size = fwpkg_get_firmware_img_size(fwpkg);
-		strlcpy(bus->fwsig_filename, pfw_path, sizeof(bus->fwsig_filename));
+		strscpy(bus->fwsig_filename, pfw_path, sizeof(bus->fwsig_filename));
 		DHD_ERROR(("%s Using COMBINED image (size %d)\n",
 			__FUNCTION__, file_size));
 	}
@@ -12170,7 +12170,7 @@ extract_hex_field(char * line, uint16 start_pos, uint16 num_chars, uint16 * valu
 {
 	char field [8];
 
-	strlcpy(field, line + start_pos, sizeof(field));
+	strscpy(field, line + start_pos, sizeof(field));
 
 	return (sscanf (field, "%hX", value) == 1);
 }
@@ -12534,7 +12534,7 @@ dhd_bus_set_get_bus_wake(dhd_pub_t *dhd, int set)
 void
 dhd_bus_set_signature_path(struct dhd_bus *bus, char *sig_path)
 {
-	strlcpy(bus->fwsig_filename, sig_path, sizeof(bus->fwsig_filename));
+	strscpy(bus->fwsig_filename, sig_path, sizeof(bus->fwsig_filename));
 }
 
 int

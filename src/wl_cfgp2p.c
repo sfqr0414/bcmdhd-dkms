@@ -1367,7 +1367,7 @@ wl_cfgp2p_vndr_ie(struct bcm_cfg80211 *cfg, u8 *iebuf, s32 pktflag,
 
 	memset((u8*)hdr, 0, sizeof(vndr_ie_setbuf_t));
 	/* Copy the vndr_ie SET command ("add"/"del") to the buffer */
-	strlcpy(hdr->cmd, add_del_cmd, sizeof(hdr->cmd));
+	strscpy(hdr->cmd, add_del_cmd, sizeof(hdr->cmd));
 
 	/* Set the IE count - the buffer contains only 1 IE */
 	iecount = htod32(1);
@@ -2578,7 +2578,7 @@ wl_cfgp2p_register_ndev(struct bcm_cfg80211 *cfg)
 	}
 #endif /* WL_NEWCFG_PRIVCMD_SUPPORT */
 
-	strlcpy(net->name, "p2p%d", sizeof(net->name));
+	strscpy(net->name, "p2p%d", sizeof(net->name));
 
 	/* Copy the reference to bcm_cfg80211 */
 	memcpy((void *)netdev_priv(net), &cfg, sizeof(struct bcm_cfg80211 *));

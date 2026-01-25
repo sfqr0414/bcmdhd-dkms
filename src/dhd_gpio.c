@@ -2,6 +2,7 @@
 #include <osl.h>
 #include <dhd_linux.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/delay.h>
 
 #ifdef BCMDHD_DTS
@@ -37,17 +38,13 @@ bcmdhd_wlan {
 static int
 dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 {
-	int gpio_wl_reg_on = adapter->gpio_wl_reg_on;
+	struct gpio_desc *gpiod_wl_reg_on = adapter->gpiod_wl_reg_on;
 	int err = 0;
 
 	if (on) {
-		printf("======== PULL WL_REG_ON(%d) HIGH! ========\n", gpio_wl_reg_on);
-		if (gpio_wl_reg_on >= 0) {
-			err = gpio_direction_output(gpio_wl_reg_on, 1);
-			if (err) {
-				printf("%s: WL_REG_ON didn't output high\n", __FUNCTION__);
-				return -EIO;
-			}
+		printf("======== PULL WL_REG_ON HIGH! ========\n");
+		if (gpiod_wl_reg_on) {
+			gpiod_set_value_cansleep(gpiod_wl_reg_on, 1);
 		}
 		/* Standardized power sequence: wait for module to power up */
 		mdelay(20);
@@ -81,13 +78,9 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 		}
 #endif /* BCMPCIE */
 #endif /* BUS_POWER_RESTORE */
-		printf("======== PULL WL_REG_ON(%d) LOW! ========\n", gpio_wl_reg_on);
-		if (gpio_wl_reg_on >= 0) {
-			err = gpio_direction_output(gpio_wl_reg_on, 0);
-			if (err) {
-				printf("%s: WL_REG_ON didn't output low\n", __FUNCTION__);
-				return -EIO;
-			}
+		printf("======== PULL WL_REG_ON LOW! ========\n");
+		if (gpiod_wl_reg_on) {
+			gpiod_set_value_cansleep(gpiod_wl_reg_on, 0);
 		}
 		/* Standardized power sequence: wait for module to power down */
 		mdelay(20);
@@ -247,9 +240,9 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 	struct device_node *root_node = NULL;
 #endif
 	int err = 0;
-	int gpio_wl_reg_on = -1;
+	struct gpio_desc *gpiod_wl_reg_on = NULL;
 #ifdef CUSTOMER_OOB
-	int gpio_wl_host_wake = -1;
+	struct gpio_desc *gpiod_wl_host_wake = NULL;
 	int host_oob_irq = -1;
 	uint host_oob_irq_flags = 0;
 #ifdef CUSTOMER_HW_ROCKCHIP
@@ -258,6 +251,13 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 #endif
 #endif
 #endif
+	struct device *dev = NULL;
+
+	/* Initialize legacy GPIO numbers to invalid */
+	adapter->gpio_wl_reg_on = -1;
+#ifdef CUSTOMER_OOB
+	adapter->gpio_wl_host_wake = -1;
+#endif
 
 	/* Please check your schematic and fill right GPIO number which connected to
 	* WL_REG_ON and WL_HOST_WAKE.
@@ -265,67 +265,70 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 #ifdef BCMDHD_DTS
 #ifdef BCMDHD_PLATDEV
 	if (adapter->pdev) {
+		dev = &adapter->pdev->dev;
 		root_node = adapter->pdev->dev.of_node;
-		strcpy(wlan_node, root_node->name);
+		if (root_node) {
+			if (strscpy(wlan_node, root_node->name, sizeof(wlan_node)) < 0) {
+				printf("%s: wlan_node name too long\n", __FUNCTION__);
+				return -1;
+			}
+		} else {
+			printf("%s: root_node is NULL\n", __FUNCTION__);
+			return -1;
+		}
 	} else {
 		printf("%s: adapter->pdev is NULL\n", __FUNCTION__);
 		return -1;
 	}
 #else
-	strcpy(wlan_node, DHD_DT_COMPAT_ENTRY);
+	strscpy(wlan_node, DHD_DT_COMPAT_ENTRY, sizeof(wlan_node));
 	root_node = of_find_compatible_node(NULL, NULL, wlan_node);
 #endif
 	printf("======== Get GPIO from DTS(%s) ========\n", wlan_node);
-	if (root_node) {
-		gpio_wl_reg_on = of_get_named_gpio(root_node, GPIO_WL_REG_ON_PROPNAME, 0);
+	
+	/* Get GPIO descriptors using gpiod API */
+	if (dev && root_node) {
+		gpiod_wl_reg_on = devm_gpiod_get_optional(dev, "wl_reg_on", GPIOD_OUT_LOW);
+		if (IS_ERR(gpiod_wl_reg_on)) {
+			err = PTR_ERR(gpiod_wl_reg_on);
+			printf("%s: Failed to get WL_REG_ON GPIO descriptor: %d\n", __FUNCTION__, err);
+			gpiod_wl_reg_on = NULL;
+		} else if (gpiod_wl_reg_on) {
+			/* Set descriptor name for debugging */
+			gpiod_set_consumer_name(gpiod_wl_reg_on, "WL_REG_ON");
+			/* Store legacy GPIO number for compatibility */
+			adapter->gpio_wl_reg_on = desc_to_gpio(gpiod_wl_reg_on);
+		}
 #ifdef CUSTOMER_OOB
-		gpio_wl_host_wake = of_get_named_gpio(root_node, GPIO_WL_HOST_WAKE_PROPNAME, 0);
-#endif
-	} else
-#endif
-	{
-		gpio_wl_reg_on = -1;
-#ifdef CUSTOMER_OOB
-		gpio_wl_host_wake = -1;
+		gpiod_wl_host_wake = devm_gpiod_get_optional(dev, "wl_host_wake", GPIOD_IN);
+		if (IS_ERR(gpiod_wl_host_wake)) {
+			err = PTR_ERR(gpiod_wl_host_wake);
+			printf("%s: Failed to get WL_HOST_WAKE GPIO descriptor: %d\n", __FUNCTION__, err);
+			gpiod_wl_host_wake = NULL;
+		} else if (gpiod_wl_host_wake) {
+			/* Set descriptor name for debugging */
+			gpiod_set_consumer_name(gpiod_wl_host_wake, "WL_HOST_WAKE");
+			/* Store legacy GPIO number for compatibility */
+			adapter->gpio_wl_host_wake = desc_to_gpio(gpiod_wl_host_wake);
+		}
 #endif
 	}
+#endif /* BCMDHD_DTS */
 
-	if (gpio_wl_reg_on >= 0) {
-		err = gpio_request(gpio_wl_reg_on, "WL_REG_ON");
-		if (err < 0) {
-			printf("%s: gpio_request(%d) for WL_REG_ON failed %d\n",
-				__FUNCTION__, gpio_wl_reg_on, err);
-			gpio_wl_reg_on = -1;
-		}
-	}
-	adapter->gpio_wl_reg_on = gpio_wl_reg_on;
+	adapter->gpiod_wl_reg_on = gpiod_wl_reg_on;
 
 #ifdef CUSTOMER_OOB
-	adapter->gpio_wl_host_wake = -1;
-	if (gpio_wl_host_wake >= 0) {
-		err = gpio_request(gpio_wl_host_wake, "bcmdhd");
-		if (err < 0) {
-			printf("%s: gpio_request(%d) for WL_HOST_WAKE failed %d\n",
-				__FUNCTION__, gpio_wl_host_wake, err);
-			return -1;
-		}
-		adapter->gpio_wl_host_wake = gpio_wl_host_wake;
-		err = gpio_direction_input(gpio_wl_host_wake);
-		if (err < 0) {
-			printf("%s: gpio_direction_input(%d) for WL_HOST_WAKE failed %d\n",
-				__FUNCTION__, gpio_wl_host_wake, err);
-			gpio_free(gpio_wl_host_wake);
-			return -1;
-		}
-		host_oob_irq = gpio_to_irq(gpio_wl_host_wake);
+	adapter->gpiod_wl_host_wake = NULL;
+	if (gpiod_wl_host_wake) {
+		adapter->gpiod_wl_host_wake = gpiod_wl_host_wake;
+		host_oob_irq = gpiod_to_irq(gpiod_wl_host_wake);
 		if (host_oob_irq < 0) {
-			printf("%s: gpio_to_irq(%d) for WL_HOST_WAKE failed %d\n",
-				__FUNCTION__, gpio_wl_host_wake, host_oob_irq);
-			gpio_free(gpio_wl_host_wake);
+			printf("%s: gpiod_to_irq for WL_HOST_WAKE failed %d\n",
+				__FUNCTION__, host_oob_irq);
 			return -1;
 		}
 	}
-/* No platform-specific override: use gpio_to_irq() result when available */
+/* No platform-specific override: use gpiod_to_irq() result when available */
 
 #ifdef CUSTOMER_HW_ROCKCHIP
 	host_oob_irq = rockchip_wifi_get_oob_irq();
@@ -354,10 +357,10 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 
 	adapter->irq_num = host_oob_irq;
 	adapter->intr_flags = host_oob_irq_flags;
-	printf("%s: WL_HOST_WAKE=%d, oob_irq=%d, oob_irq_flags=0x%x\n", __FUNCTION__,
-		gpio_wl_host_wake, host_oob_irq, host_oob_irq_flags);
+	printf("%s: WL_HOST_WAKE descriptor=%p, oob_irq=%d, oob_irq_flags=0x%x\n", __FUNCTION__,
+		gpiod_wl_host_wake, host_oob_irq, host_oob_irq_flags);
 #endif /* CUSTOMER_OOB */
-	printf("%s: WL_REG_ON=%d\n", __FUNCTION__, gpio_wl_reg_on);
+	printf("%s: WL_REG_ON descriptor=%p\n", __FUNCTION__, gpiod_wl_reg_on);
 
 	return 0;
 }
@@ -365,22 +368,21 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 static void
 dhd_wlan_deinit_gpio(wifi_adapter_info_t *adapter)
 {
-	int gpio_wl_reg_on = adapter->gpio_wl_reg_on;
-#ifdef CUSTOMER_OOB
-	int gpio_wl_host_wake = adapter->gpio_wl_host_wake;
-#endif
+	/* GPIOs obtained via devm_gpiod_get_optional are automatically freed
+	 * when the device is unbound. We just need to clear our references.
+	 */
+	if (adapter->gpiod_wl_reg_on) {
+		printf("%s: Clearing WL_REG_ON GPIO descriptor\n", __FUNCTION__);
+		adapter->gpiod_wl_reg_on = NULL;
+	}
+	adapter->gpio_wl_reg_on = -1;
 
-	if (gpio_wl_reg_on >= 0) {
-		printf("%s: gpio_free(WL_REG_ON %d)\n", __FUNCTION__, gpio_wl_reg_on);
-		gpio_free(gpio_wl_reg_on);
-		adapter->gpio_wl_reg_on = -1;
-	}
 #ifdef CUSTOMER_OOB
-	if (gpio_wl_host_wake >= 0) {
-		printf("%s: gpio_free(WL_HOST_WAKE %d)\n", __FUNCTION__, gpio_wl_host_wake);
-		gpio_free(gpio_wl_host_wake);
-		adapter->gpio_wl_host_wake = -1;
+	if (adapter->gpiod_wl_host_wake) {
+		printf("%s: Clearing WL_HOST_WAKE GPIO descriptor\n", __FUNCTION__);
+		adapter->gpiod_wl_host_wake = NULL;
 	}
+	adapter->gpio_wl_host_wake = -1;
 #endif /* CUSTOMER_OOB */
 }
 

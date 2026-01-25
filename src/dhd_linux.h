@@ -264,6 +264,12 @@ typedef struct wifi_adapter_info {
 	uint		bus_num;
 	uint		slot_num;
 	int			index;
+	/* GPIO descriptor API (Linux 6.18.3+) - preferred */
+	struct gpio_desc *gpiod_wl_reg_on;
+#ifdef CUSTOMER_OOB
+	struct gpio_desc *gpiod_wl_host_wake;
+#endif
+	/* Legacy integer GPIO numbers - deprecated, for compatibility */
 	int 		gpio_wl_reg_on;
 #ifdef CUSTOMER_OOB
 	int 		gpio_wl_host_wake;

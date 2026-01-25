@@ -5565,7 +5565,7 @@ wl_ext_iapsta_ccode(struct wl_if_info *cur_if,
 	char country_str[WLC_CNTRY_BUF_SZ] = { 0 };
 
 	if (event_type == WLC_E_COUNTRY_CODE_CHANGED) {
-		if (strlcpy(country_str, data, WL_CCODE_LEN + 1) >= WLC_CNTRY_BUF_SZ) {
+		if (strscpy(country_str, data, WL_CCODE_LEN + 1) < 0) {
 			return;
 		}
 		WL_MSG(cur_if->ifname, "Updating new country %s\n", country_str);
