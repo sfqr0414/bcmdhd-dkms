@@ -2,7 +2,13 @@
 #include <osl.h>
 #include <dhd_linux.h>
 #include <linux/gpio.h>
+/* Linux 6.18.3+ GPIO descriptor API */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
 #include <linux/gpio/consumer.h>
+#else
+/* Fallback for older kernels - will use legacy GPIO API */
+#warning "GPIO descriptor API not available, falling back to legacy GPIO API"
+#endif
 #include <linux/delay.h>
 
 #ifdef BCMDHD_DTS
@@ -12,6 +18,44 @@
 #include <linux/platform_device.h>
 #endif
 /* Rockchip-specific rfkill removed; use standard RFKill in cfg80211 */
+
+/* Legacy GPIO API compatibility shim for kernels < 4.5.0 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+/* Provide stub implementations that return -ENOTSUPP for old kernels */
+static inline struct gpio_desc *devm_gpiod_get_optional(struct device *dev,
+		const char *con_id, enum gpiod_flags flags)
+{
+	return ERR_PTR(-ENOTSUPP);
+}
+
+static inline void gpiod_set_value_cansleep(struct gpio_desc *desc, int value)
+{
+	/* No-op for compatibility */
+}
+
+static inline int gpiod_to_irq(const struct gpio_desc *desc)
+{
+	return -ENOTSUPP;
+}
+
+static inline int desc_to_gpio(const struct gpio_desc *desc)
+{
+	return -EINVAL;
+}
+
+static inline void gpiod_set_consumer_name(struct gpio_desc *desc, const char *name)
+{
+	/* No-op for compatibility */
+}
+
+/* Define GPIOD flags for compilation */
+#ifndef GPIOD_OUT_LOW
+#define GPIOD_OUT_LOW 0
+#endif
+#ifndef GPIOD_IN
+#define GPIOD_IN 0
+#endif
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) */
 
 #ifdef CONFIG_DHD_USE_STATIC_BUF
 /* use canonical prototype: void *dhd_wlan_mem_prealloc( ... ) declared in src/dhd.h */
@@ -140,7 +184,10 @@ dhd_wlan_get_mac_addr(unsigned char *buf, int ifidx)
 		struct ether_addr ea_example = {{0x02, 0x11, 0x22, 0x33, 0x44, 0x55}};
 		bcopy((char *)&ea_example, buf, sizeof(struct ether_addr));
 #endif /* EXAMPLE_GET_MAC */
-#ifdef BCMDHD_PLATDEV
+/* BCMDHD_PLATDEV MAC address retrieval disabled: adapter parameter not available in callback context.
+ * This should be implemented via platform data registration, not here.
+ */
+#if 0 && defined(BCMDHD_PLATDEV)
 		if (adapter->pdev && adapter->pdev->dev.of_node) {
 			const void *mac_addr;
 			int mac_len;
@@ -445,4 +492,23 @@ void
 dhd_wlan_deinit_plat_data(wifi_adapter_info_t *adapter)
 {
 	dhd_wlan_deinit_gpio(adapter);
+}
+
+/* Legacy GPIO number compatibility API - returns -ENOTSUPP if gpiod not available */
+int
+dhd_wlan_get_gpio_number(wifi_adapter_info_t *adapter, const char *gpio_name)
+{
+	if (!adapter || !gpio_name)
+		return -EINVAL;
+
+	if (strcmp(gpio_name, "wl_reg_on") == 0) {
+		return adapter->gpio_wl_reg_on;
+	}
+#ifdef CUSTOMER_OOB
+	else if (strcmp(gpio_name, "wl_host_wake") == 0) {
+		return adapter->gpio_wl_host_wake;
+	}
+#endif
+	
+	return -ENOTSUPP;
 }

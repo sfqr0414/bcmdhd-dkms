@@ -1,0 +1,1 @@
+savedcmd_/home/runner/work/bcmdhd-dkms/bcmdhd-dkms/src/dhd_static_buf_sdio.o := ld -m elf_x86_64 -z noexecstack --no-warn-rwx-segments --strip-debug  -r -o /home/runner/work/bcmdhd-dkms/bcmdhd-dkms/src/dhd_static_buf_sdio.o @/home/runner/work/bcmdhd-dkms/bcmdhd-dkms/src/dhd_static_buf_sdio.mod 

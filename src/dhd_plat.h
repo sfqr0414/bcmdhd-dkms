@@ -104,5 +104,8 @@ extern uint16 dhd_plat_align_rxbuf_size(uint16 rxbufpost_sz);
 extern int dhd_wlan_init_plat_data(wifi_adapter_info_t *adapter);
 extern void dhd_wlan_deinit_plat_data(wifi_adapter_info_t *adapter);
 
+/* Legacy GPIO number compatibility API - returns -ENOTSUPP if gpiod not available */
+extern int dhd_wlan_get_gpio_number(wifi_adapter_info_t *adapter, const char *gpio_name);
+
 #endif /* __linux__ */
 #endif /* __DHD_PLAT_H__ */
