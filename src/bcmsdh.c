@@ -922,9 +922,19 @@ bcmsdh_sleep(void *sdh, bool enab)
 int
 bcmsdh_gpio_init(void *sdh)
 {
-	bcmsdh_info_t *p = (bcmsdh_info_t *)sdh;
-	sdioh_info_t *sd = (sdioh_info_t *)(p->sdioh);
+	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 
+	if (!bcmsdh) {
+		pr_err("%s: bcmsdh is NULL\n", __FUNCTION__);
+		return -EINVAL;
+	}
+
+	if (!bcmsdh->sdioh) {
+		pr_err("%s: sdioh is NULL\n", __FUNCTION__);
+		return -EINVAL;
+	}
+
+	sdioh_info_t *sd = (sdioh_info_t *)(bcmsdh->sdioh);
 	return sdioh_gpio_init(sd);
 }
 
@@ -983,9 +993,19 @@ bcmsdh_gpioin(void *sdh, uint32 gpio)
 int
 bcmsdh_gpioouten(void *sdh, uint32 gpio)
 {
-	bcmsdh_info_t *p = (bcmsdh_info_t *)sdh;
-	sdioh_info_t *sd = (sdioh_info_t *)(p->sdioh);
+	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 
+	if (!bcmsdh) {
+		pr_err("%s: bcmsdh is NULL\n", __FUNCTION__);
+		return -EINVAL;
+	}
+
+	if (!bcmsdh->sdioh) {
+		pr_err("%s: sdioh is NULL\n", __FUNCTION__);
+		return -EINVAL;
+	}
+
+	sdioh_info_t *sd = (sdioh_info_t *)(bcmsdh->sdioh);
 	return sdioh_gpioouten(sd, gpio);
 }
 
