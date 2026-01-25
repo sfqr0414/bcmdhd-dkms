@@ -189,7 +189,7 @@ bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva, void *adapter_info)
 	bcmsdh->adapter = adapter_info;
 	bcmsdh->wl_reg_on_desc = NULL;
 	bcmsdh->wl_host_wake_desc = NULL;
-	
+
 	if (adapter_info) {
 		wifi_adapter_info_t *adapter = (wifi_adapter_info_t *)adapter_info;
 		/* Cache GPIO descriptors from adapter for fast access */
@@ -929,31 +929,50 @@ bcmsdh_gpioin(void *sdh, uint32 gpio)
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 	struct gpio_desc *desc = NULL;
 	int value;
-	
+
 	if (!bcmsdh) {
 		pr_err("%s: bcmsdh is NULL\n", __FUNCTION__);
 		return FALSE;
 	}
 
-	/* Use cached GPIO descriptor - typically this reads WL_HOST_WAKE */
+	/* Use cached GPIO descriptor for platform GPIOs (WL_HOST_WAKE)
+	 * gpio parameter can be used to select descriptor if needed.
+	 * For now, we use WL_HOST_WAKE for OOB, or WL_REG_ON as fallback.
+	 */
 #ifdef CUSTOMER_OOB
-	desc = (struct gpio_desc *)bcmsdh->wl_host_wake_desc;
+	if (bcmsdh->wl_host_wake_desc) {
+		desc = (struct gpio_desc *)bcmsdh->wl_host_wake_desc;
+	}
 #else
-	/* If not using OOB, might be reading WL_REG_ON status */
-	desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
+	if (bcmsdh->wl_reg_on_desc && gpio == 0) {
+		/* If not using OOB, might be reading WL_REG_ON status */
+		desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
+	}
 #endif
-	
-	if (!desc) {
-		pr_warn("%s: GPIO descriptor not available (gpio=%u)\n", __FUNCTION__, gpio);
-		/* Fall back to legacy sdioh implementation for compatibility */
+
+	if (desc) {
+		/* Use gpiod API to read GPIO value */
+		value = gpiod_get_value_cansleep(desc);
+		if (value < 0) {
+			/* Error reading GPIO, log and fall through to legacy */
+			pr_warn("%s: gpiod_get_value_cansleep failed with error %d\n",
+				__FUNCTION__, value);
+		} else {
+			return (value > 0) ? TRUE : FALSE;
+		}
+	}
+
+	/* For device-internal GPIOs or when descriptor not available or on error,
+	 * fall back to legacy sdioh implementation for compatibility
+	 */
+	if (bcmsdh->sdioh) {
 		sdioh_info_t *sd = (sdioh_info_t *)(bcmsdh->sdioh);
 		return sdioh_gpioin(sd, gpio);
 	}
 
-	/* Use gpiod API to read GPIO value */
-	value = gpiod_get_value_cansleep(desc);
-	
-	return (value > 0) ? TRUE : FALSE;
+	pr_warn("%s: GPIO descriptor not available and sdioh is NULL (gpio=%u)\n",
+		__FUNCTION__, gpio);
+	return FALSE;
 }
 
 int
@@ -970,28 +989,35 @@ bcmsdh_gpioout(void *sdh, uint32 gpio, bool enab)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 	struct gpio_desc *desc = NULL;
-	
+
 	if (!bcmsdh) {
 		pr_err("%s: bcmsdh is NULL\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
-	/* Use cached GPIO descriptor instead of integer GPIO lookup */
-	/* Assuming gpio parameter is used as identifier (e.g., WL_REG_ON) */
-	/* In most cases, WL_REG_ON is the primary GPIO being controlled */
-	desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
-	
-	if (!desc) {
-		pr_warn("%s: GPIO descriptor not available (gpio=%u)\n", __FUNCTION__, gpio);
-		/* Fall back to legacy sdioh implementation for compatibility */
+	/* Use cached GPIO descriptor for platform GPIOs (WL_REG_ON)
+	 * For now, we primarily handle WL_REG_ON through the descriptor API.
+	 * Other GPIO numbers (like GPIO_DEV_WAKEUP=17) are device-internal
+	 * GPIOs that go through the legacy sdioh path.
+	 */
+	if (bcmsdh->wl_reg_on_desc && gpio == 0) {
+		/* gpio=0 can be used as an indicator for WL_REG_ON control */
+		desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
+		gpiod_set_value_cansleep(desc, enab ? 1 : 0);
+		return 0;
+	}
+
+	/* For device-internal GPIOs or when descriptor not available,
+	 * fall back to legacy sdioh implementation for compatibility
+	 */
+	if (bcmsdh->sdioh) {
 		sdioh_info_t *sd = (sdioh_info_t *)(bcmsdh->sdioh);
 		return sdioh_gpioout(sd, gpio, enab);
 	}
 
-	/* Use gpiod API to set GPIO value */
-	gpiod_set_value_cansleep(desc, enab ? 1 : 0);
-	
-	return 0;
+	pr_warn("%s: GPIO descriptor not available and sdioh is NULL (gpio=%u)\n",
+		__FUNCTION__, gpio);
+	return -ENODEV;
 }
 
 uint
