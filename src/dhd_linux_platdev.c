@@ -518,12 +518,15 @@ static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 	}
 	
 	/* Ensure WL_REG_ON GPIO is explicitly driven low for shutdown */
-	if (adapter->gpiod_wl_reg_on) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+	if (adapter->gpiod_wl_reg_on) {
 		gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
 		DHD_ERROR(("%s: WL_REG_ON explicitly set to LOW via gpiod\n", __FUNCTION__));
-#endif
 	}
+#else
+	/* Kernel version < 4.5.0 does not support gpiod API */
+	DHD_ERROR(("%s: gpiod API not available, relying on platform power-off sequence\n", __FUNCTION__));
+#endif
 	
 	DHD_ERROR(("%s: Platform shutdown complete\n", __FUNCTION__));
 }
