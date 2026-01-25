@@ -151,6 +151,12 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 		SDLX_ERR(("%s: bcmsdh_attach failed\n", __FUNCTION__));
 		goto err;
 	}
+	
+	/* Stage 3: Cache GPIO descriptors for hot-path performance */
+	if (adapter_info) {
+		bcmsdh_cache_gpio_descriptors(bcmsdh, adapter_info);
+	}
+	
 	bcmsdh_osinfo = MALLOC(osh, sizeof(bcmsdh_os_info_t));
 	if (bcmsdh_osinfo == NULL) {
 		SDLX_ERR(("%s: failed to allocate bcmsdh_os_info_t\n", __FUNCTION__));

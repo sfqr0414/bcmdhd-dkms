@@ -328,7 +328,10 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 		return -1;
 	}
 #else
-	strscpy(wlan_node, DHD_DT_COMPAT_ENTRY, sizeof(wlan_node));
+	if (strscpy(wlan_node, DHD_DT_COMPAT_ENTRY, sizeof(wlan_node)) < 0) {
+		printf("%s: DHD_DT_COMPAT_ENTRY name too long\n", __FUNCTION__);
+		return -1;
+	}
 	root_node = of_find_compatible_node(NULL, NULL, wlan_node);
 #endif
 	printf("======== Get GPIO from DTS(%s) ========\n", wlan_node);

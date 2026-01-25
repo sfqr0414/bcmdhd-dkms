@@ -48,6 +48,10 @@
 #include<linux/regulator/consumer.h>
 #include<linux/of_gpio.h>
 #endif /* CONFIG_DTS */
+/* Stage 4: Include for GPIO descriptor support in shutdown hook */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#include <linux/gpio/consumer.h>
+#endif
 
 #if defined(CUSTOMER_HW) || defined(BCMDHD_PLATDEV)
 extern int dhd_wlan_init_plat_data(wifi_adapter_info_t *adapter);
@@ -63,9 +67,8 @@ extern void dhd_wlan_deinit_plat_data(wifi_adapter_info_t *adapter);
 /* weak dhd_get_device_dt_name is implemented below; no extern needed here */
 #endif /* SUPPORT_MULTIPLE_BOARD_REVISION */
 
-#ifdef DHD_WIFI_SHUTDOWN
-extern void wifi_plat_dev_drv_shutdown(struct platform_device *pdev);
-#endif
+/* Stage 4: Forward declaration for shutdown function (implemented below) */
+static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev);
 
 #ifdef CONFIG_DTS
 struct regulator *wifi_regulator = NULL;
@@ -472,6 +475,62 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 	return wifi_plat_dev_probe_ret;
 }
 
+/**
+ * Stage 4: Platform shutdown hook to ensure clean WiFi module state on reboot
+ * This forces WL_REG_ON low during system shutdown/reboot to prevent hot reboot issues.
+ * Hot reboots can leave the WiFi module in an inconsistent state if WL_REG_ON remains high.
+ */
+static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
+{
+	wifi_adapter_info_t *adapter;
+	
+	DHD_ERROR(("%s: Platform shutdown - forcing WL_REG_ON low for clean reboot\n", __FUNCTION__));
+	
+	/* Android style wifi platform data device ("bcmdhd_wlan" or "bcm4329_wlan")
+	 * is kept for backward compatibility and supports only 1 adapter
+	 */
+	if (!dhd_wifi_platdata) {
+		DHD_ERROR(("%s: dhd_wifi_platdata is NULL\n", __FUNCTION__));
+		return;
+	}
+	
+	if (dhd_wifi_platdata->num_adapters < 1) {
+		DHD_ERROR(("%s: No adapters configured\n", __FUNCTION__));
+		return;
+	}
+	
+	adapter = &dhd_wifi_platdata->adapters[0];
+	
+	/* Force power off to ensure WL_REG_ON is driven low
+	 * This prevents hot reboot issues where the module remains powered
+	 */
+	if (is_power_on) {
+		DHD_ERROR(("%s: Forcing WiFi power off for shutdown\n", __FUNCTION__));
+#ifdef BCMPCIE
+		/* For PCIE: disconnect bus first, then power off */
+		wifi_platform_bus_enumerate(adapter, FALSE);
+		wifi_platform_set_power(adapter, FALSE, WIFI_TURNOFF_DELAY);
+#else
+		/* For SDIO/USB: power off first, then disconnect bus */
+		wifi_platform_set_power(adapter, FALSE, WIFI_TURNOFF_DELAY);
+		wifi_platform_bus_enumerate(adapter, FALSE);
+#endif /* BCMPCIE */
+	}
+	
+	/* Ensure WL_REG_ON GPIO is explicitly driven low for shutdown */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+	if (adapter->gpiod_wl_reg_on) {
+		gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
+		DHD_ERROR(("%s: WL_REG_ON explicitly set to LOW via gpiod\n", __FUNCTION__));
+	}
+#else
+	/* Kernel version < 4.5.0 does not support gpiod API */
+	DHD_ERROR(("%s: gpiod API not available, relying on platform power-off sequence\n", __FUNCTION__));
+#endif
+	
+	DHD_ERROR(("%s: Platform shutdown complete\n", __FUNCTION__));
+}
+
 static int wifi_plat_dev_drv_remove(struct platform_device *pdev)
 {
 	wifi_adapter_info_t *adapter;
@@ -534,9 +593,7 @@ static struct platform_driver wifi_platform_dev_driver = {
 	.remove         = wifi_plat_dev_drv_remove,
 	.suspend        = wifi_plat_dev_drv_suspend,
 	.resume         = wifi_plat_dev_drv_resume,
-#ifdef DHD_WIFI_SHUTDOWN
-	.shutdown       = wifi_plat_dev_drv_shutdown,
-#endif /* DHD_WIFI_SHUTDOWN */
+	.shutdown       = wifi_plat_dev_drv_shutdown,  /* Stage 4: Always include shutdown hook */
 	.driver         = {
 	.name   = WIFI_PLAT_NAME,
 #ifdef CONFIG_DTS
@@ -550,9 +607,7 @@ static struct platform_driver wifi_platform_dev_driver_legacy = {
 	.remove         = wifi_plat_dev_drv_remove,
 	.suspend        = wifi_plat_dev_drv_suspend,
 	.resume         = wifi_plat_dev_drv_resume,
-#ifdef DHD_WIFI_SHUTDOWN
-	.shutdown       = wifi_plat_dev_drv_shutdown,
-#endif /* DHD_WIFI_SHUTDOWN */
+	.shutdown       = wifi_plat_dev_drv_shutdown,  /* Stage 4: Always include shutdown hook */
 	.driver         = {
 	.name	= WIFI_PLAT_NAME2,
 	}
