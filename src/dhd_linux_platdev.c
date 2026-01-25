@@ -484,18 +484,18 @@ static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 {
 	wifi_adapter_info_t *adapter;
 	
-	printf("%s: Platform shutdown - forcing WL_REG_ON low for clean reboot\n", __FUNCTION__);
+	DHD_ERROR(("%s: Platform shutdown - forcing WL_REG_ON low for clean reboot\n", __FUNCTION__));
 	
 	/* Android style wifi platform data device ("bcmdhd_wlan" or "bcm4329_wlan")
 	 * is kept for backward compatibility and supports only 1 adapter
 	 */
 	if (!dhd_wifi_platdata) {
-		printf("%s: dhd_wifi_platdata is NULL\n", __FUNCTION__);
+		DHD_ERROR(("%s: dhd_wifi_platdata is NULL\n", __FUNCTION__));
 		return;
 	}
 	
 	if (dhd_wifi_platdata->num_adapters < 1) {
-		printf("%s: No adapters configured\n", __FUNCTION__);
+		DHD_ERROR(("%s: No adapters configured\n", __FUNCTION__));
 		return;
 	}
 	
@@ -505,7 +505,7 @@ static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 	 * This prevents hot reboot issues where the module remains powered
 	 */
 	if (is_power_on) {
-		printf("%s: Forcing WiFi power off for shutdown\n", __FUNCTION__);
+		DHD_ERROR(("%s: Forcing WiFi power off for shutdown\n", __FUNCTION__));
 #ifdef BCMPCIE
 		/* For PCIE: disconnect bus first, then power off */
 		wifi_platform_bus_enumerate(adapter, FALSE);
@@ -521,11 +521,11 @@ static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 	if (adapter->gpiod_wl_reg_on) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
 		gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
-		printf("%s: WL_REG_ON explicitly set to LOW via gpiod\n", __FUNCTION__);
+		DHD_ERROR(("%s: WL_REG_ON explicitly set to LOW via gpiod\n", __FUNCTION__));
 #endif
 	}
 	
-	printf("%s: Platform shutdown complete\n", __FUNCTION__);
+	DHD_ERROR(("%s: Platform shutdown complete\n", __FUNCTION__));
 }
 
 static int wifi_plat_dev_drv_remove(struct platform_device *pdev)
