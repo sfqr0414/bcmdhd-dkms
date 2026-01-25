@@ -5562,7 +5562,7 @@ si_devpathvar(const si_t *sih, char *var, int len, const char *name)
 		if (strlen(name) + 1 > (uint)(len - path_len))
 			var[0] = '\0';
 		else
-			strlcpy(var + path_len, name, len - path_len);
+			strscpy(var + path_len, name, len - path_len);
 	}
 
 	return var;
@@ -5582,7 +5582,7 @@ si_pcie_devpathvar(const si_t *sih, char *var, int len, const char *name)
 		if (strlen(name) + 1 > (uint)(len - path_len))
 			var[0] = '\0';
 		else
-			strlcpy(var + path_len, name, len - path_len);
+			strscpy(var + path_len, name, len - path_len);
 	}
 
 	return var;

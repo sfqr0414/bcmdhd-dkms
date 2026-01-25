@@ -2794,7 +2794,7 @@ int dhd_sar_init_parameter(dhd_pub_t *dhd, eCountry_flag_type type, int advance_
 			           __FUNCTION__, next));
 			return BCME_ERROR;
 		}
-		strlcpy(temp_str, next, sizeof(temp_str));
+		strscpy(temp_str, next, sizeof(temp_str));
 		temp_str[len] = 0;
 		txpwr_list[idx] = (uint32)simple_strtoul(temp_str, NULL, 0);
 		DHD_TRACE(("%s: get txpwr[%d]=0x%x\n",
@@ -7869,7 +7869,7 @@ int dhd_keep_alive_onoff(dhd_pub_t *dhd)
 
 	str = "mkeep_alive";
 	str_len = strlen(str);
-	strlcpy(buf, str, sizeof(buf));
+	strscpy(buf, str, sizeof(buf));
 	mkeep_alive_pktp = (wl_mkeep_alive_pkt_v1_t *) (buf + str_len + 1);
 	bzero(&mkeep_alive_pkt, sizeof(mkeep_alive_pkt));
 	mkeep_alive_pkt.period_msec = dhd->conf->keep_alive_period;
@@ -8104,7 +8104,7 @@ wl_iw_parse_ssid_list(char** list_str, wlc_ssid_t* ssid, int idx, int max)
 
 		if (idx < max) {
 			bzero(ssid[idx].SSID, sizeof(ssid[idx].SSID));
-			strlcpy((char*)ssid[idx].SSID, str, sizeof(ssid[idx].SSID));
+			strscpy((char*)ssid[idx].SSID, str, sizeof(ssid[idx].SSID));
 			ssid[idx].SSID_len = sizeof(ssid[idx].SSID);
 		}
 		idx++;
@@ -10598,7 +10598,7 @@ dhd_print_fw_ver_from_file(dhd_pub_t *dhdp, char *fwpath)
 	* core capture logs will contain FW version read from the file
 	*/
 	memset(fw_version, 0, FW_VER_STR_LEN);
-	strlcpy(fw_version, str, FW_VER_STR_LEN);
+	strscpy(fw_version, str, FW_VER_STR_LEN);
 
 exit:
 	if (file)
@@ -11609,7 +11609,7 @@ dhd_convert_memdump_type_to_str(uint32 type, char *buf, size_t buf_len, int subs
 			break;
 	}
 
-	strlcpy(buf, type_str, buf_len);
+	strscpy(buf, type_str, buf_len);
 }
 #endif /* DHD_DEBUG */
 
@@ -11881,7 +11881,7 @@ dhd_convert_hang_reason_to_str(uint32 reason, char *buf, size_t buf_len)
 			break;
 	}
 
-	strlcpy(buf, type_str, buf_len);
+	strscpy(buf, type_str, buf_len);
 }
 #endif /* DHD_COREDUMP */
 #ifdef DHD_CUSTOM_CONFIG_RTS_IN_SUSPEND

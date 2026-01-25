@@ -102,7 +102,7 @@ s32 wldev_ioctl(
 	ioc.len = len;
 	ioc.set = set;
 
-	strlcpy(ifr.ifr_name, dev->name, sizeof(ifr.ifr_name));
+	strscpy(ifr.ifr_name, dev->name, sizeof(ifr.ifr_name));
 	ifr.ifr_data = (caddr_t)&ioc;
 
 	GETFS_AND_SETFS_TO_KERNEL_DS(fs);
@@ -560,21 +560,21 @@ int wldev_get_mode(
 
 	if (band == WL_CHANSPEC_BAND_2G) {
 		if (bss->n_cap)
-			strlcpy(cap, "n", caplen);
+			strscpy(cap, "n", caplen);
 		else
-			strlcpy(cap, "bg", caplen);
+			strscpy(cap, "bg", caplen);
 	} else if (band == WL_CHANSPEC_BAND_5G) {
 		if (bandwidth == WL_CHANSPEC_BW_80)
-			strlcpy(cap, "ac", caplen);
+			strscpy(cap, "ac", caplen);
 		else if ((bandwidth == WL_CHANSPEC_BW_40) || (bandwidth == WL_CHANSPEC_BW_20)) {
 			if ((bss->nbss_cap & 0xf00) && (bss->n_cap))
-				strlcpy(cap, "n|ac", caplen);
+				strscpy(cap, "n|ac", caplen);
 			else if (bss->n_cap)
-				strlcpy(cap, "n", caplen);
+				strscpy(cap, "n", caplen);
 			else if (bss->vht_cap)
-				strlcpy(cap, "ac", caplen);
+				strscpy(cap, "ac", caplen);
 			else
-				strlcpy(cap, "a", caplen);
+				strscpy(cap, "a", caplen);
 		} else {
 			WLDEV_ERROR(("wldev_get_mode: Mode get failed\n"));
 			error = BCME_ERROR;

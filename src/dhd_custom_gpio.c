@@ -217,7 +217,7 @@ static int syna_country_flag_find(char *cntry)
 			DHD_ERROR(("%s: invalid n=%d!\n", __FUNCTION__, n));
 			return BCME_BUFTOOLONG;
 		} else {
-			strlcpy(country, cntry, WLC_CNTRY_BUF_SZ);
+			strscpy(country, cntry, WLC_CNTRY_BUF_SZ);
 			country[n] = '\0';
 			DHD_TRACE(("%s: here n=%d, country='%s'!\n",
 			           __FUNCTION__, n, country));
@@ -299,7 +299,7 @@ int syna_country_update_type_list(eCountry_flag_type type, char *list_str)
 		if (0 <= n) {
 			/* update or add a new item */
 			syna_cntry_flag[n].type = type;
-			strlcpy(syna_cntry_flag[n].ccode, next, WLC_CNTRY_BUF_SZ);
+			strscpy(syna_cntry_flag[n].ccode, next, WLC_CNTRY_BUF_SZ);
 			syna_cntry_flag[n].ccode[len] = '\0';
 			DHD_TRACE(("%s: cntry list [%d] type=%d ccode=%s\n",
 			           __FUNCTION__, n,
@@ -454,7 +454,7 @@ get_customized_country_code(void *adapter, char *country_iso_code, wl_country_t 
 #endif /* CUSTOM_COUNTRY_CODE */
 
 	if (cloc_ptr) {
-		strlcpy(cspec->ccode, cloc_ptr->custom_locale, WLC_CNTRY_BUF_SZ);
+		strscpy(cspec->ccode, cloc_ptr->custom_locale, WLC_CNTRY_BUF_SZ);
 		cspec->rev = cloc_ptr->custom_locale_rev;
 	}
 	return;

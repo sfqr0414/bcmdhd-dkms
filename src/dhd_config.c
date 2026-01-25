@@ -2153,8 +2153,8 @@ dhd_conf_same_country(dhd_pub_t *dhd, char *buf)
 	int ret;
 	bool match = TRUE;
 
-	strlcpy(cspec.country_abbrev, buf, WL_CCODE_LEN + 1);
-	strlcpy(cspec.ccode, buf, WL_CCODE_LEN + 1);
+	strscpy(cspec.country_abbrev, buf, WL_CCODE_LEN + 1);
+	strscpy(cspec.ccode, buf, WL_CCODE_LEN + 1);
 	dhd_conf_map_country_list(dhd, &cspec);
 	dhd_conf_get_country(dhd, &cur_cspec);
 	if (!strncmp(cspec.ccode, ccode_all->cspec.ccode, 2) &&
@@ -2200,8 +2200,8 @@ dhd_conf_country(dhd_pub_t *dhd, char *cmd, char *buf)
 		if (dhd_conf_same_country(dhd, buf)) {
 			return 0;
 		}
-		strlcpy(cspec.country_abbrev, buf, WL_CCODE_LEN + 1);
-		strlcpy(cspec.ccode, buf, WL_CCODE_LEN + 1);
+		strscpy(cspec.country_abbrev, buf, WL_CCODE_LEN + 1);
+		strscpy(cspec.ccode, buf, WL_CCODE_LEN + 1);
 		dhd_conf_map_country_list(dhd, &cspec);
 		if (!strncmp(cspec.ccode, ccode_all->cspec.ccode, 2))
 			err = dhd_conf_set_country_all(dhd, &cspec);

@@ -243,7 +243,7 @@ static inline void* dhd_rxf_dequeue(dhd_pub_t *dhdp)
 	dhdp->skbbuf[sent_idx] = NULL;
 	dhdp->sent_idx = (sent_idx + 1) & (MAXSKBPEND - 1);
 
-	DHD_TRACE(("dhd_rxf_dequeue: netif_rx_ni(%p), sent idx %d\n",
+	DHD_TRACE(("dhd_rxf_dequeue: netif_rx(%p), sent idx %d\n",
 		skb, sent_idx));
 
 	dhd_os_rxfunlock(dhdp);
@@ -1075,7 +1075,7 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 				/* If the receive is not processed inside an ISR,
 				 * the softirqd must be woken explicitly to service
 				 * the NET_RX_SOFTIRQ.	In 2.6 kernels, this is handled
-				 * by netif_rx_ni(), but in earlier kernels, we need
+				 * by netif_rx(), but in earlier kernels, we need
 				 * to do it manually.
 				 */
 				bcm_object_trace_opr(skb, BCM_OBJDBG_REMOVE,
@@ -1266,7 +1266,7 @@ dhd_rx_mon_pkt_sdio(dhd_pub_t *dhdp, void *pkt, int ifidx)
 		eth_type_trans(dhd->monitor_skb, dhd->monitor_skb->dev);
 	dhd->monitor_len = 0;
 
-	netif_rx_ni(dhd->monitor_skb);
+	netif_rx(dhd->monitor_skb);
 
 	dhd->monitor_skb = NULL;
 }
@@ -1402,7 +1402,7 @@ dhd_rx_mon_pkt(dhd_pub_t *dhdp, host_rxbuf_cmpl_t* msg, void *pkt, int ifidx)
 		/* If the receive is not processed inside an ISR,
 		 * the softirqd must be woken explicitly to service
 		 * the NET_RX_SOFTIRQ.	In 2.6 kernels, this is handled
-		 * by netif_rx_ni(), but in earlier kernels, we need
+		 * by netif_rx(), but in earlier kernels, we need
 		 * to do it manually.
 		 */
 		bcm_object_trace_opr(dhd->monitor_skb, BCM_OBJDBG_REMOVE,

@@ -2299,7 +2299,7 @@ wl_cfg80211_p2p_if_add(struct bcm_cfg80211 *cfg,
 		wl_cfgp2p_init_discovery(cfg);
 	}
 
-	strlcpy(cfg->p2p->vir_ifname, name, sizeof(cfg->p2p->vir_ifname));
+	strscpy(cfg->p2p->vir_ifname, name, sizeof(cfg->p2p->vir_ifname));
 	/* In concurrency case, STA may be already associated in a particular channel.
 	 * so retrieve the current channel of primary interface and then start the virtual
 	 * interface on that.
@@ -3273,7 +3273,7 @@ wl_cfg80211_notify_ifadd(struct net_device *dev,
 		if_event_info->ifidx = ifidx;
 		if_event_info->bssidx = bssidx;
 		if_event_info->role = role;
-		strlcpy(if_event_info->name, name, sizeof(if_event_info->name));
+		strscpy(if_event_info->name, name, sizeof(if_event_info->name));
 		if_event_info->name[IFNAMSIZ - 1] = '\0';
 		if (mac)
 			memcpy(if_event_info->mac, mac, ETHER_ADDR_LEN);
@@ -3475,7 +3475,7 @@ wl_cfg80211_ibss_vsie_delete(struct net_device *dev)
 			goto end;
 		}
 		/* change the command from "add" to "del" */
-		strlcpy(cfg->ibss_vsie->cmd, "del", sizeof(cfg->ibss_vsie->cmd));
+		strscpy(cfg->ibss_vsie->cmd, "del", sizeof(cfg->ibss_vsie->cmd));
 
 		ret = wldev_iovar_setbuf_bsscfg(dev, "vndr_ie",
 				cfg->ibss_vsie, cfg->ibss_vsie_len,
@@ -12164,8 +12164,8 @@ wl_is_ccode_change_required(struct net_device *net,
 	}
 	/* If translation table is available, update cspec */
 	cspec.rev = revinfo;
-	strlcpy(cspec.country_abbrev, country_code, WL_CCODE_LEN + 1);
-	strlcpy(cspec.ccode, country_code, WL_CCODE_LEN + 1);
+	strscpy(cspec.country_abbrev, country_code, WL_CCODE_LEN + 1);
+	strscpy(cspec.ccode, country_code, WL_CCODE_LEN + 1);
 	dhd_get_customized_country_code(net, cspec.country_abbrev, &cspec);
 	if ((cur_cspec.rev == cspec.rev) &&
 		(strncmp(cur_cspec.ccode, cspec.ccode, WL_CCODE_LEN) == 0) &&
@@ -12459,7 +12459,7 @@ wl_cfg80211_set_country_code(struct net_device *net, char *country_code,
 	wl_cfg80211_cleanup_connection(net, user_enforced);
 
 	/* Store before applying - so that if event comes earlier that is handled properly */
-	if (strlcpy(cfg->country, country_code, WL_CCODE_LEN + 1) >= WLC_CNTRY_BUF_SZ) {
+	if (strscpy(cfg->country, country_code, WL_CCODE_LEN + 1) < 0) {
 		WL_ERR(("country code copy failed :%d\n", ret));
 		goto exit;
 	}
@@ -17235,7 +17235,7 @@ wl_cfg80211_ccode_evt_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgde
 #endif /* EXT_REGD_INFO */
 	char country_str[WLC_CNTRY_BUF_SZ] = { 0 };
 
-	if (strlcpy(country_str, data, WL_CCODE_LEN+1) >= WLC_CNTRY_BUF_SZ) {
+	if (strscpy(country_str, data, WL_CCODE_LEN+1) < 0) {
 		return -EINVAL;
 	}
 
@@ -17257,7 +17257,7 @@ wl_cfg80211_ccode_evt_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgde
 
 	/* update the country with new value */
 #ifdef EXT_REGD_INFO
-	strlcpy(cfg->country, country_str, WLC_CNTRY_BUF_SZ);
+	strscpy(cfg->country, country_str, WLC_CNTRY_BUF_SZ);
 
 	wl_cfg80211_regd_update(cfg, country_str);
 #else
@@ -22400,7 +22400,7 @@ s32 wl_sd_handle_sd_find(
 	}
 
 	/* Apply the p2p_ie for p2po_find */
-	strlcpy(ie_setbuf->cmd, "add", sizeof(ie_setbuf->cmd));
+	strscpy(ie_setbuf->cmd, "add", sizeof(ie_setbuf->cmd));
 
 	vndriebuf = &ie_setbuf->vndr_ie_buffer;
 	vndriebuf->iecount = htod32(1);
@@ -26312,7 +26312,7 @@ wl_mkeep_alive_update(struct bcm_cfg80211 *cfg)
 		bzero(pbuf, KA_TEMP_BUF_SIZE);
 		str = "mkeep_alive";
 		str_len = strlen(str);
-		strlcpy(pbuf, str, KA_TEMP_BUF_SIZE);
+		strscpy(pbuf, str, KA_TEMP_BUF_SIZE);
 		buf_len = str_len + 1;
 		res = wldev_iovar_getbuf(primary_ndev, "mkeep_alive", &mkeep_alive_id,
 			sizeof(mkeep_alive_id), &pbuf[buf_len], KA_TEMP_BUF_SIZE - buf_len,
@@ -26445,7 +26445,7 @@ wl_cfg80211_start_mkeep_alive(struct net_device *ndev, struct bcm_cfg80211 *cfg,
 	bzero(pbuf, KA_TEMP_BUF_SIZE);
 	str = "mkeep_alive";
 	str_len = strlen(str);
-	strlcpy(pbuf, str, KA_TEMP_BUF_SIZE);
+	strscpy(pbuf, str, KA_TEMP_BUF_SIZE);
 	buf_len = str_len + 1;
 	pbuf_len -= buf_len;
 

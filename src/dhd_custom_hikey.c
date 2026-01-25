@@ -335,7 +335,10 @@ uint32 dhd_plat_get_rc_device_id(void)
 	return HIKEY_PCIE_DEVICE_ID;
 }
 
+/* Legacy Path A (device_initcall) disabled in favor of Path B (bus probe) for Linux 6.18.3+ */
+#if 0
 #ifndef BCMDHD_MODULAR
 /* Required only for Built-in DHD */
 device_initcall(dhd_wlan_init);
 #endif /* BOARD_HIKEY_MODULAR */
+#endif /* disabled legacy path */
