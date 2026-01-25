@@ -1027,7 +1027,7 @@ bcmsdh_gpioout(void *sdh, uint32 gpio, bool enab)
 	 */
 	if (bcmsdh->wl_reg_on_desc && gpio == GPIO_WL_REG_ON_INDEX) {
 		desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
-		/* gpiod_set_value_cansleep returns void, no error checking needed */
+		/* gpiod_set_value_cansleep returns void and handles invalid descriptors internally */
 		gpiod_set_value_cansleep(desc, enab ? 1 : 0);
 		return 0;
 	}
