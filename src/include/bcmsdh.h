@@ -64,7 +64,7 @@ typedef enum {
 } dhd_hang_state_t;
 #endif
 
-extern bcmsdh_info_t *bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva);
+extern bcmsdh_info_t *bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva, void *adapter_info);
 /**
  * BCMSDH API context
  */
@@ -78,6 +78,10 @@ struct bcmsdh_info
 	uint32	sbwad;		/* Save backplane window address */
 	void	*os_cxt;        /* Pointer to per-OS private data */
 	bool	force_sbwad_calc; /* forces calculation of sbwad instead of using cached value */
+	/* GPIO descriptor cache for gpiod migration (Phase 3-4) */
+	void	*adapter;	/* Pointer to wifi_adapter_info_t */
+	void	*wl_reg_on_desc;	/* struct gpio_desc for WL_REG_ON */
+	void	*wl_host_wake_desc;	/* struct gpio_desc for WL_HOST_WAKE */
 #ifdef DHD_WAKE_STATUS
 	unsigned int	total_wake_count;
 	int		pkt_wake;

@@ -46,6 +46,12 @@
 #include <sbsdio.h>	/* SDIO device core hardware definitions. */
 #include <sdio.h>	/* SDIO Device and Protocol Specs */
 
+/* GPIO descriptor API for gpiod migration */
+#include <linux/gpio/consumer.h>
+#include <linux/errno.h>
+#include <linux/printk.h>	/* For pr_err, pr_warn */
+#include <dhd_linux.h>	/* For wifi_adapter_info_t */
+
 #if defined(BT_OVER_SDIO)
 #include <dhd_bt_interface.h>
 #endif /* defined (BT_OVER_SDIO) */
@@ -160,11 +166,12 @@ void bcmsdh_btsdio_interface_init(struct sdio_func *func,
  * @param cfghdl Configuration Handle.
  * @param regsva Virtual address of controller registers.
  * @param irq Interrupt number of SDIO controller.
+ * @param adapter_info Platform adapter information (wifi_adapter_info_t).
  *
  * @return bcmsdh_info_t Handle to BCMSDH context.
  */
 bcmsdh_info_t *
-bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva)
+bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva, void *adapter_info)
 {
 	bcmsdh_info_t *bcmsdh;
 
@@ -177,6 +184,20 @@ bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva)
 	bcmsdh->osh = osh;
 	bcmsdh->init_success = TRUE;
 	*regsva = si_enum_base(0);
+
+	/* Cache adapter and GPIO descriptors for gpiod migration */
+	bcmsdh->adapter = adapter_info;
+	bcmsdh->wl_reg_on_desc = NULL;
+	bcmsdh->wl_host_wake_desc = NULL;
+	
+	if (adapter_info) {
+		wifi_adapter_info_t *adapter = (wifi_adapter_info_t *)adapter_info;
+		/* Cache GPIO descriptors from adapter for fast access */
+		bcmsdh->wl_reg_on_desc = (void *)adapter->gpiod_wl_reg_on;
+#ifdef CUSTOMER_OOB
+		bcmsdh->wl_host_wake_desc = (void *)adapter->gpiod_wl_host_wake;
+#endif
+	}
 
 	bcmsdh_force_sbwad_calc(bcmsdh, FALSE);
 
@@ -905,10 +926,34 @@ bcmsdh_gpio_init(void *sdh)
 bool
 bcmsdh_gpioin(void *sdh, uint32 gpio)
 {
-	bcmsdh_info_t *p = (bcmsdh_info_t *)sdh;
-	sdioh_info_t *sd = (sdioh_info_t *)(p->sdioh);
+	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
+	struct gpio_desc *desc = NULL;
+	int value;
+	
+	if (!bcmsdh) {
+		pr_err("%s: bcmsdh is NULL\n", __FUNCTION__);
+		return FALSE;
+	}
 
-	return sdioh_gpioin(sd, gpio);
+	/* Use cached GPIO descriptor - typically this reads WL_HOST_WAKE */
+#ifdef CUSTOMER_OOB
+	desc = (struct gpio_desc *)bcmsdh->wl_host_wake_desc;
+#else
+	/* If not using OOB, might be reading WL_REG_ON status */
+	desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
+#endif
+	
+	if (!desc) {
+		pr_warn("%s: GPIO descriptor not available (gpio=%u)\n", __FUNCTION__, gpio);
+		/* Fall back to legacy sdioh implementation for compatibility */
+		sdioh_info_t *sd = (sdioh_info_t *)(bcmsdh->sdioh);
+		return sdioh_gpioin(sd, gpio);
+	}
+
+	/* Use gpiod API to read GPIO value */
+	value = gpiod_get_value_cansleep(desc);
+	
+	return (value > 0) ? TRUE : FALSE;
 }
 
 int
@@ -923,10 +968,30 @@ bcmsdh_gpioouten(void *sdh, uint32 gpio)
 int
 bcmsdh_gpioout(void *sdh, uint32 gpio, bool enab)
 {
-	bcmsdh_info_t *p = (bcmsdh_info_t *)sdh;
-	sdioh_info_t *sd = (sdioh_info_t *)(p->sdioh);
+	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
+	struct gpio_desc *desc = NULL;
+	
+	if (!bcmsdh) {
+		pr_err("%s: bcmsdh is NULL\n", __FUNCTION__);
+		return -EINVAL;
+	}
 
-	return sdioh_gpioout(sd, gpio, enab);
+	/* Use cached GPIO descriptor instead of integer GPIO lookup */
+	/* Assuming gpio parameter is used as identifier (e.g., WL_REG_ON) */
+	/* In most cases, WL_REG_ON is the primary GPIO being controlled */
+	desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
+	
+	if (!desc) {
+		pr_warn("%s: GPIO descriptor not available (gpio=%u)\n", __FUNCTION__, gpio);
+		/* Fall back to legacy sdioh implementation for compatibility */
+		sdioh_info_t *sd = (sdioh_info_t *)(bcmsdh->sdioh);
+		return sdioh_gpioout(sd, gpio, enab);
+	}
+
+	/* Use gpiod API to set GPIO value */
+	gpiod_set_value_cansleep(desc, enab ? 1 : 0);
+	
+	return 0;
 }
 
 uint

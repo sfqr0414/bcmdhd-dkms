@@ -146,7 +146,7 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 	uint32 vendevid;
 	bcmsdh_os_info_t *bcmsdh_osinfo = NULL;
 
-	bcmsdh = bcmsdh_attach(osh, sdioh, &regs);
+	bcmsdh = bcmsdh_attach(osh, sdioh, &regs, adapter_info);
 	if (bcmsdh == NULL) {
 		SDLX_ERR(("%s: bcmsdh_attach failed\n", __FUNCTION__));
 		goto err;
