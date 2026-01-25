@@ -20,5 +20,5 @@ This driver has been adapted for Linux kernel 6.18.3 with the following key chan
 ### Stability Improvements
 - **Platform Shutdown Hook**: Ensures WiFi chip is properly reset during system reboot by pulling WL_REG_ON low
 
-### Deprecated Files
-- `dhd_custom_hikey.c`: Board-specific file present but not compiled (not referenced in Makefile)
+## Build Notes
+All module variants (SDIO, PCIe, USB) build properly. The file `dhd_custom_hikey.c` exists in the source tree for reference but is not included in any build targets.
