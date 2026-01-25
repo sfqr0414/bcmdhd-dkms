@@ -46,6 +46,12 @@
 #include <sbsdio.h>	/* SDIO device core hardware definitions. */
 #include <sdio.h>	/* SDIO Device and Protocol Specs */
 
+/* Stage 3: Include for GPIO descriptor support */
+#include <dhd_linux.h>	/* wifi_adapter_info_t */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#include <linux/gpio/consumer.h>
+#endif
+
 #if defined(BT_OVER_SDIO)
 #include <dhd_bt_interface.h>
 #endif /* defined (BT_OVER_SDIO) */
@@ -198,6 +204,11 @@ bcmsdh_detach(osl_t *osh, void *sdh)
 #if defined(NDIS) && (NDISVER < 0x0630)
 		if (bcmsdh->sdioh)
 			sdioh_detach(osh, bcmsdh->sdioh);
+#endif
+		/* Stage 3: Clear cached GPIO descriptors */
+		bcmsdh->cached_gpiod_wl_reg_on = NULL;
+#ifdef CUSTOMER_OOB
+		bcmsdh->cached_gpiod_wl_host_wake = NULL;
 #endif
 		MFREE(osh, bcmsdh, sizeof(bcmsdh_info_t));
 	}
@@ -943,5 +954,64 @@ bcmsdh_get_spend_time(void *sdh)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 	return (sdioh_get_spend_time(bcmsdh->sdioh));
+}
+#endif
+
+/**
+ * Stage 3: Cache GPIO descriptors from adapter for hot-path performance
+ * This avoids pointer chasing through adapter structure in frequent operations.
+ *
+ * @param sdh SDIO host context
+ * @param adapter_info Pointer to wifi_adapter_info_t containing GPIO descriptors
+ */
+void
+bcmsdh_cache_gpio_descriptors(bcmsdh_info_t *sdh, void *adapter_info)
+{
+	wifi_adapter_info_t *adapter = (wifi_adapter_info_t *)adapter_info;
+	
+	if (!sdh || !adapter) {
+		BCMSDH_ERROR(("%s: NULL sdh or adapter\n", __FUNCTION__));
+		return;
+	}
+
+	/* Cache WL_REG_ON GPIO descriptor for hot-path access */
+	sdh->cached_gpiod_wl_reg_on = adapter->gpiod_wl_reg_on;
+	
+#ifdef CUSTOMER_OOB
+	/* Cache WL_HOST_WAKE GPIO descriptor for interrupt handling */
+	sdh->cached_gpiod_wl_host_wake = adapter->gpiod_wl_host_wake;
+#endif
+
+	BCMSDH_INFO(("%s: Cached GPIO descriptors - WL_REG_ON=%p\n",
+		__FUNCTION__, sdh->cached_gpiod_wl_reg_on));
+}
+
+/**
+ * Stage 3: Get cached WL_REG_ON GPIO descriptor for hot-path operations
+ *
+ * @param sdh SDIO host context
+ * @return Cached GPIO descriptor or NULL
+ */
+struct gpio_desc *
+bcmsdh_get_cached_wl_reg_on(bcmsdh_info_t *sdh)
+{
+	if (!sdh)
+		return NULL;
+	return sdh->cached_gpiod_wl_reg_on;
+}
+
+#ifdef CUSTOMER_OOB
+/**
+ * Stage 3: Get cached WL_HOST_WAKE GPIO descriptor for interrupt operations
+ *
+ * @param sdh SDIO host context
+ * @return Cached GPIO descriptor or NULL
+ */
+struct gpio_desc *
+bcmsdh_get_cached_wl_host_wake(bcmsdh_info_t *sdh)
+{
+	if (!sdh)
+		return NULL;
+	return sdh->cached_gpiod_wl_host_wake;
 }
 #endif

@@ -50,6 +50,7 @@ extern const uint bcmsdh_msglevel;
 /* forward declarations */
 typedef struct bcmsdh_info bcmsdh_info_t;
 typedef void (*bcmsdh_cb_fn_t)(void *);
+struct gpio_desc; /* Forward declaration for GPIO descriptor */
 
 #if defined(NDIS) && (NDISVER >= 0x0630) && defined(BCMDONGLEHOST)
 extern bcmsdh_info_t *bcmsdh_attach(osl_t *osh, void *cfghdl,
@@ -82,6 +83,11 @@ struct bcmsdh_info
 	unsigned int	total_wake_count;
 	int		pkt_wake;
 #endif /* DHD_WAKE_STATUS */
+	/* Stage 3: Cached GPIO descriptors for hot-path performance */
+	struct gpio_desc *cached_gpiod_wl_reg_on;	/* Cached WL_REG_ON descriptor */
+#ifdef CUSTOMER_OOB
+	struct gpio_desc *cached_gpiod_wl_host_wake;	/* Cached WL_HOST_WAKE descriptor */
+#endif
 };
 #endif /* defined(NDIS) && (NDISVER >= 0x0630) && defined(BCMDONGLEHOST) */
 
@@ -297,6 +303,13 @@ extern int bcmsdh_gpio_init(void *sd);
 extern bool bcmsdh_gpioin(void *sd, uint32 gpio);
 extern int bcmsdh_gpioouten(void *sd, uint32 gpio);
 extern int bcmsdh_gpioout(void *sd, uint32 gpio, bool enab);
+
+/* Stage 3: Cached GPIO descriptor access for hot-path performance */
+extern void bcmsdh_cache_gpio_descriptors(bcmsdh_info_t *sdh, void *adapter_info);
+extern struct gpio_desc *bcmsdh_get_cached_wl_reg_on(bcmsdh_info_t *sdh);
+#ifdef CUSTOMER_OOB
+extern struct gpio_desc *bcmsdh_get_cached_wl_host_wake(bcmsdh_info_t *sdh);
+#endif
 
 #ifdef DHD_WAKE_STATUS
 extern int bcmsdh_get_total_wake(bcmsdh_info_t *bcmsdh);
