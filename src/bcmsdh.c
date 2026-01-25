@@ -56,6 +56,9 @@
 #include <dhd_bt_interface.h>
 #endif /* defined (BT_OVER_SDIO) */
 
+/* GPIO index constants for platform GPIO descriptor API */
+#define GPIO_WL_REG_ON_INDEX	0	/* Platform GPIO index for WL_REG_ON */
+
 #define SDIOH_API_ACCESS_RETRY_LIMIT	2
 const uint bcmsdh_msglevel = BCMSDH_ERROR_VAL;
 
@@ -192,10 +195,12 @@ bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva, void *adapter_info)
 
 	if (adapter_info) {
 		wifi_adapter_info_t *adapter = (wifi_adapter_info_t *)adapter_info;
-		/* Cache GPIO descriptors from adapter for fast access */
-		bcmsdh->wl_reg_on_desc = (void *)adapter->gpiod_wl_reg_on;
+		/* Cache GPIO descriptors from adapter for fast access
+		 * Store as void* to avoid exposing gpio_desc type in header
+		 */
+		bcmsdh->wl_reg_on_desc = adapter->gpiod_wl_reg_on;
 #ifdef CUSTOMER_OOB
-		bcmsdh->wl_host_wake_desc = (void *)adapter->gpiod_wl_host_wake;
+		bcmsdh->wl_host_wake_desc = adapter->gpiod_wl_host_wake;
 #endif
 	}
 
@@ -937,14 +942,14 @@ bcmsdh_gpioin(void *sdh, uint32 gpio)
 
 	/* Use cached GPIO descriptor for platform GPIOs (WL_HOST_WAKE)
 	 * gpio parameter can be used to select descriptor if needed.
-	 * For now, we use WL_HOST_WAKE for OOB, or WL_REG_ON as fallback.
+	 * For OOB, we use WL_HOST_WAKE; otherwise WL_REG_ON as fallback.
 	 */
 #ifdef CUSTOMER_OOB
 	if (bcmsdh->wl_host_wake_desc) {
 		desc = (struct gpio_desc *)bcmsdh->wl_host_wake_desc;
 	}
 #else
-	if (bcmsdh->wl_reg_on_desc && gpio == 0) {
+	if (bcmsdh->wl_reg_on_desc && gpio == GPIO_WL_REG_ON_INDEX) {
 		/* If not using OOB, might be reading WL_REG_ON status */
 		desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
 	}
@@ -996,13 +1001,13 @@ bcmsdh_gpioout(void *sdh, uint32 gpio, bool enab)
 	}
 
 	/* Use cached GPIO descriptor for platform GPIOs (WL_REG_ON)
-	 * For now, we primarily handle WL_REG_ON through the descriptor API.
+	 * GPIO_WL_REG_ON_INDEX (0) is used as an indicator for WL_REG_ON control.
 	 * Other GPIO numbers (like GPIO_DEV_WAKEUP=17) are device-internal
 	 * GPIOs that go through the legacy sdioh path.
 	 */
-	if (bcmsdh->wl_reg_on_desc && gpio == 0) {
-		/* gpio=0 can be used as an indicator for WL_REG_ON control */
+	if (bcmsdh->wl_reg_on_desc && gpio == GPIO_WL_REG_ON_INDEX) {
 		desc = (struct gpio_desc *)bcmsdh->wl_reg_on_desc;
+		/* gpiod_set_value_cansleep returns void, no error checking needed */
 		gpiod_set_value_cansleep(desc, enab ? 1 : 0);
 		return 0;
 	}
