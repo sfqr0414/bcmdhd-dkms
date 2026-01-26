@@ -58,6 +58,7 @@ extern int dhd_open(struct net_device *net);
 #include <linux/reboot.h>
 #include <linux/notifier.h>
 #include <linux/irq.h>
+#include <linux/kernel_stat.h>
 #if defined(CONFIG_TIZEN)
 #include <linux/net_stat_tizen.h>
 #endif /* CONFIG_TIZEN */
@@ -73,7 +74,13 @@ extern int dhd_open(struct net_device *net);
 #include <asm/unaligned.h>
 #endif
 #include <dhd_linux_priv.h>
-#include <net/rps.h>
+#if defined(__has_include)
+# if __has_include(<net/rps.h>)
+#  include <net/rps.h>
+# endif
+#elif defined(CONFIG_RPS)
+# include <net/rps.h>
+#endif
 #include "dhd_protos.h"
 /* All function prototypes should be canonicalized into headers or marked static.
  * -Wmissing-prototypes suppression removed to surface missing prototype diagnostics.
@@ -22247,10 +22254,12 @@ dhd_print_kirqstats(dhd_pub_t *dhd, unsigned int irq_num)
 	bcm_binit(&strbuf, tmp_buf, KIRQ_PRINT_BUF_LEN);
 	raw_spin_lock_irqsave(&desc->lock, flags);
 	bcm_bprintf(&strbuf, "dhd irq %u:", irq_num);
+	/* Use kstat_irqs_cpu() to abstract over kernel ABI differences (some kernels
+	 * store per-cpu irq stats as struct irqstat, others as plain unsigned int).
+	 */
 	for_each_online_cpu(i) {
 		unsigned int irqcnt = 0;
-		if (desc->kstat_irqs)
-			irqcnt = per_cpu_ptr(desc->kstat_irqs, i)->cnt;
+		irqcnt = kstat_irqs_cpu(irq_num, i);
 		bcm_bprintf(&strbuf, "%10u ", irqcnt);
 	}
 	if (desc->irq_data.chip) {

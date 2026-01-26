@@ -501,7 +501,10 @@ endif
 endif
 
 ARCH ?= arm64
-BCMDHD_ROOT = $(src)  # 内核会自动将src设为源码目录，无需修改
+# Prefer the 'src' variable passed by the kernel build; otherwise use current dir.
+# Strip trailing slashes/spaces to avoid producing broken command-line tokens.
+BCMDHD_ROOT := $(strip $(patsubst %/,%,$(if $(src),$(src),$(CURDIR))))
+# Debug: $(warning BCMDHD_ROOT=$(BCMDHD_ROOT))
 #$(warning "BCMDHD_ROOT=$(BCMDHD_ROOT)")
 EXTRA_CFLAGS = $(DHDCFLAGS)
 EXTRA_CFLAGS += -DDHD_COMPILED=\"$(BCMDHD_ROOT)\"

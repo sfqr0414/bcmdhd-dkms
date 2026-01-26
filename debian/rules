@@ -5,6 +5,9 @@ include /usr/share/dpkg/architecture.mk
 
 export DEB_CFLAGS_MAINT_APPEND = -pthread
 
+# Build dir used by override targets
+MK_BUILD_DIR := $(CURDIR)/bcmdhd_build
+
 %:
 	dh $@
 
@@ -20,3 +23,16 @@ override_dh_dkms:
 
 override_dh_builddeb:
 	dh_builddeb -- -Zxz
+
+# Build override: ensure intermediate artifacts live in a separate BUILD_DIR
+override_dh_auto_build:
+	# Place build intermediates in a dedicated directory to avoid polluting src/
+	# Make sure the build dir is clean and present
+	rm -rf "$(MK_BUILD_DIR)"; mkdir -p "$(MK_BUILD_DIR)"; \
+	# Use the verification script which invokes kernel builds with M=$(MK_BUILD_DIR)
+	./src/verify_builds.sh
+
+# Clean override: remove the dedicated build directory on dh clean
+override_dh_clean:
+	dh_clean
+	-rm -rf $(shell pwd)/bcmdhd_build
