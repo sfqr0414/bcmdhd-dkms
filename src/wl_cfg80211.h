@@ -1259,7 +1259,7 @@ struct wl_event_q {
 	u32 id;			/* counter to track events */
 	wl_event_msg_t emsg;
 	u32 datalen;
-	s8 edata[1];
+	s8 edata[]; /* flexible array member for event data */
 };
 
 /* security information with currently associated ap */

@@ -253,12 +253,12 @@ int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long
 	}
 #if defined(CONFIG_DTS) || defined(BCMDHD_DTS)
 	if (on) {
-		printf("======== PULL WL_REG_ON HIGH! ========\n");
+		DHD_INFO(("======== PULL WL_REG_ON HIGH! ========\n"));
 		/* Try asserting WL_REG_ON early before regulators as some boards require this */
 		if (adapter && adapter->gpiod_wl_reg_on) {
 			gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 1);
 			msleep(20);
-			printf("%s: WL_REG_ON asserted early (gpio=%d)\n", __FUNCTION__, adapter->gpio_wl_reg_on);
+			DHD_INFO(("WL_REG_ON asserted early (gpio=%d)\n", adapter->gpio_wl_reg_on));
 		}
 		/* Enable regulators (vmmc then vqmmc) */
 		if (adapter && adapter->regulator) {
@@ -267,11 +267,11 @@ int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long
 				DHD_ERROR(("%s: regulator_enable(vmmc) failed: %d", __FUNCTION__, err));
 				goto fail;
 			}
-			printf("%s: vmmc regulator enabled\n", __FUNCTION__);
+			DHD_INFO(("vmmc regulator enabled\n"));
 			/* allow regulator to ramp */
 			msleep(100);
 		} else {
-			printf("%s: vmmc regulator not available, skipping enable\n", __FUNCTION__);
+			DHD_INFO(("vmmc regulator not available, skipping enable\n"));
 		}
 		if (adapter && adapter->vqmmc) {
 			err = regulator_enable(adapter->vqmmc);
@@ -279,53 +279,61 @@ int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long
 				DHD_ERROR(("%s: regulator_enable(vqmmc) failed: %d", __FUNCTION__, err));
 				/* try to continue */
 			}
-			printf("%s: vqmmc regulator enabled\n", __FUNCTION__);
+			DHD_INFO(("vqmmc regulator enabled\n"));
 			msleep(100);
 		} else {
-			printf("%s: vqmmc regulator not available, skipping enable\n", __FUNCTION__);
+			DHD_INFO(("vqmmc regulator not available, skipping enable\n"));
 		}
 
 		/* Report regulators and WL_REG_ON status */
 		if (adapter && adapter->gpiod_wl_reg_on) {
-			printf("%s: WL_REG_ON state (gpio=%d) value=%d\n", __FUNCTION__, adapter->gpio_wl_reg_on,
-				gpiod_get_value_cansleep(adapter->gpiod_wl_reg_on));
+			DHD_INFO(("WL_REG_ON state (gpio=%d) value=%d\n", adapter->gpio_wl_reg_on,
+				gpiod_get_value_cansleep(adapter->gpiod_wl_reg_on)));
 			if (adapter->regulator)
-				printf("%s: vmmc enabled? %d\n", __FUNCTION__, regulator_is_enabled(adapter->regulator));
+				DHD_INFO(("vmmc enabled? %d\n", regulator_is_enabled(adapter->regulator)));
 			if (adapter->vqmmc)
-				printf("%s: vqmmc enabled? %d\n", __FUNCTION__, regulator_is_enabled(adapter->vqmmc));
+				DHD_INFO(("vqmmc enabled? %d\n", regulator_is_enabled(adapter->vqmmc)));
 			/* Trigger MMC host detection explicitly when available */
 			if (adapter->mmc) {
-				printf("%s: calling mmc_detect_change for host %p\n", __FUNCTION__, adapter->mmc);
+				DHD_INFO(("calling mmc_detect_change for host %p\n", adapter->mmc));
 				mmc_detect_change(adapter->mmc, 0);
 			}
 		} else {
-			printf("%s: WL_REG_ON gpio descriptor missing\n", __FUNCTION__);
+			DHD_INFO(("WL_REG_ON gpio descriptor missing\n"));
 		}
 		is_power_on = TRUE;
 	}
 	else {
-		printf("======== PULL WL_REG_ON LOW! ========\n");
+		DHD_INFO(("======== PULL WL_REG_ON LOW! ========\n"));
 		/* Drive WL_REG_ON low first, then disable vqmmc then vmmc regulators */
 		if (adapter && adapter->gpiod_wl_reg_on) {
 			gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
 		}
 		if (adapter && adapter->vqmmc) {
-			err = regulator_disable(adapter->vqmmc);
-			if (err < 0) {
-				DHD_ERROR(("%s: regulator_disable(vqmmc) failed: %d", __FUNCTION__, err));
+			if (regulator_is_enabled(adapter->vqmmc)) {
+				err = regulator_disable(adapter->vqmmc);
+				if (err < 0) {
+					DHD_ERROR(("regulator_disable(vqmmc) failed: %d", err));
+				}
+				DHD_INFO(("vqmmc regulator disabled\n"));
+			} else {
+				DHD_INFO(("vqmmc regulator not enabled; skipping disable\n"));
 			}
-			printf("%s: vqmmc regulator disabled\n", __FUNCTION__);
 		} else {
-			printf("%s: vqmmc regulator not available, skipping disable\n", __FUNCTION__);
+			DHD_INFO(("vqmmc regulator not available, skipping disable\n"));
 		}
 		if (adapter && adapter->regulator) {
-			err = regulator_disable(adapter->regulator);
-			if (err < 0) {
-				DHD_ERROR(("%s: regulator_disable(vmmc) failed: %d", __FUNCTION__, err));
+			if (regulator_is_enabled(adapter->regulator)) {
+				err = regulator_disable(adapter->regulator);
+				if (err < 0) {
+					DHD_ERROR(("regulator_disable(vmmc) failed: %d", err));
+				}
+				DHD_INFO(("vmmc regulator disabled\n"));
+			} else {
+				DHD_INFO(("vmmc regulator not enabled; skipping disable\n"));
 			}
-			printf("%s: vmmc regulator disabled\n", __FUNCTION__);
 		} else {
-			printf("%s: vmmc regulator not available, skipping disable\n", __FUNCTION__);
+			DHD_INFO(("vmmc regulator not available, skipping disable\n"));
 		}
 		is_power_on = FALSE;
 	}

@@ -302,13 +302,8 @@ static s32 wl_mrg_ie(struct bcm_cfg80211 *cfg, u8 *ie_stream, u16 ie_size)
 		WL_ERR(("ei_stream crosses buffer boundary\n"));
 		return -ENOSPC;
 	}
-	ret = memcpy_s(&ie->buf[ie->offset], (sizeof(ie->buf) - ie->offset),
-		ie_stream, ie_size);
-	if (ret) {
-		WL_ERR(("memcpy failed:%d, destsz: %zu, n: %d\n",
-			ret, (sizeof(ie->buf) - ie->offset), ie_size));
-		return BCME_ERROR;
-	}
+	/* bounds already checked above; use memcpy to avoid fortified runtime warning */
+	memcpy(&ie->buf[ie->offset], ie_stream, ie_size);
 	ie->offset += ie_size;
 
 	return err;

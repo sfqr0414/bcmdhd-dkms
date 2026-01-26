@@ -1,6 +1,7 @@
 
 #include <osl.h>
 #include <dhd_linux.h>
+#include <dhd_dbg.h>
 #include <linux/gpio.h>
 /* Linux 6.18.3+ GPIO descriptor API */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
@@ -92,7 +93,7 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 	int err = 0;
 
 	if (on) {
-		printf("======== PULL WL_REG_ON HIGH! ========\n");
+		DHD_INFO(("======== PULL WL_REG_ON HIGH! ========\n"));
 		/* Prefer GPIO if available */
 		if (gpiod_wl_reg_on) {
 			gpiod_set_value_cansleep(gpiod_wl_reg_on, 1);
@@ -101,22 +102,22 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 			if (adapter->regulator) {
 				err = regulator_enable(adapter->regulator);
 				if (err < 0) {
-					printf("%s: regulator_enable(vmmc) failed: %d\n", __FUNCTION__, err);
+					DHD_ERROR(("regulator_enable(vmmc) failed: %d\n", err));
 					return err;
 				}
-				printf("%s: vmmc regulator enabled\n", __FUNCTION__);
+				DHD_INFO(("vmmc regulator enabled\n"));
 			}
 			if (adapter->vqmmc) {
 				int r = regulator_enable(adapter->vqmmc);
 				if (r < 0)
-					printf("%s: regulator_enable(vqmmc) failed: %d (continuing)\n", __FUNCTION__, r);
+					DHD_ERROR(("regulator_enable(vqmmc) failed: %d (continuing)\n", r));
 				else
-					printf("%s: vqmmc regulator enabled\n", __FUNCTION__);
+					DHD_INFO(("vqmmc regulator enabled\n"));
 			}
 			/* Give rails time to stabilize */
 			msleep(50);
 		} else {
-			printf("%s: no WL_REG_ON gpio or regulators available to power on\n", __FUNCTION__);
+			DHD_ERROR(("no WL_REG_ON gpio or regulators available to power on\n"));
 			return -ENODEV;
 		}
 		/* Standardized power sequence: wait for module to power up */
@@ -125,14 +126,14 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 #ifdef BCMPCIE
 		if (adapter->pci_dev) {
 			mdelay(100);
-			printf("======== pci_set_power_state PCI_D0! ========\n");
+			DHD_INFO(("======== pci_set_power_state PCI_D0! ========\n"));
 			pci_set_power_state(adapter->pci_dev, PCI_D0);
 			if (adapter->pci_saved_state)
 				pci_load_and_free_saved_state(adapter->pci_dev, &adapter->pci_saved_state);
 			pci_restore_state(adapter->pci_dev);
 			err = pci_enable_device(adapter->pci_dev);
 			if (err < 0)
-				printf("%s: PCI enable device failed", __FUNCTION__);
+				DHD_ERROR(("PCI enable device failed\n"));
 			pci_set_master(adapter->pci_dev);
 		}
 #endif /* BCMPCIE */
@@ -142,7 +143,7 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 #ifdef BUS_POWER_RESTORE
 #ifdef BCMPCIE
 		if (adapter->pci_dev) {
-			printf("======== pci_set_power_state PCI_D3hot! ========\n");
+			DHD_INFO(("======== pci_set_power_state PCI_D3hot! ========\n"));
 			pci_save_state(adapter->pci_dev);
 			adapter->pci_saved_state = pci_store_saved_state(adapter->pci_dev);
 			if (pci_is_enabled(adapter->pci_dev))
@@ -151,7 +152,7 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 		}
 #endif /* BCMPCIE */
 #endif /* BUS_POWER_RESTORE */
-		printf("======== PULL WL_REG_ON LOW! ========\n");
+		DHD_INFO(("======== PULL WL_REG_ON LOW! ========\n"));
 		if (gpiod_wl_reg_on) {
 			gpiod_set_value_cansleep(gpiod_wl_reg_on, 0);
 		} else if (adapter && (adapter->regulator || adapter->vqmmc)) {
@@ -159,19 +160,19 @@ dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 			if (adapter->vqmmc) {
 				int r = regulator_disable(adapter->vqmmc);
 				if (r < 0)
-					printf("%s: regulator_disable(vqmmc) failed: %d\n", __FUNCTION__, r);
+					DHD_ERROR(("regulator_disable(vqmmc) failed: %d\n", r));
 				else
-					printf("%s: vqmmc regulator disabled\n", __FUNCTION__);
+					DHD_INFO(("vqmmc regulator disabled\n"));
 			}
 			if (adapter->regulator) {
 				int r = regulator_disable(adapter->regulator);
 				if (r < 0)
-					printf("%s: regulator_disable(vmmc) failed: %d\n", __FUNCTION__, r);
+					DHD_ERROR(("regulator_disable(vmmc) failed: %d\n", r));
 				else
-					printf("%s: vmmc regulator disabled\n", __FUNCTION__);
+					DHD_INFO(("vmmc regulator disabled\n"));
 			}
 		} else {
-			printf("%s: no WL_REG_ON gpio or regulators available to power off\n", __FUNCTION__);
+			DHD_ERROR(("no WL_REG_ON gpio or regulators available to power off\n"));
 		}
 		/* Standardized power sequence: wait for module to power down */
 		mdelay(20);
@@ -193,23 +194,23 @@ dhd_wlan_set_carddetect(int present)
 
 	if (present) {
 #if defined(BCMSDIO)
-		printf("======== Card detection to detect SDIO card! ========\n");
+		DHD_INFO(("======== Card detection to detect SDIO card! ========\n"));
 #ifdef CUSTOMER_HW_PLATFORM
 		err = sdhci_force_presence_change(&sdmmc_channel, 1);
 #endif /* CUSTOMER_HW_PLATFORM */
 /* platform-specific card-detect removed; rely on standard sdhci presence change */
 #elif defined(BCMPCIE)
-		printf("======== Card detection to detect PCIE card! ========\n");
+		DHD_INFO(("======== Card detection to detect PCIE card! ========\n"));
 #endif
 	} else {
 #if defined(BCMSDIO)
-		printf("======== Card detection to remove SDIO card! ========\n");
+		DHD_INFO(("======== Card detection to remove SDIO card! ========\n"));
 #ifdef CUSTOMER_HW_PLATFORM
 		err = sdhci_force_presence_change(&sdmmc_channel, 0);
 #endif /* CUSTOMER_HW_PLATFORM */
 /* platform-specific card-detect removed; rely on standard sdhci presence change */
 #elif defined(BCMPCIE)
-		printf("======== Card detection to remove PCIE card! ========\n");
+		DHD_INFO(("======== Card detection to remove PCIE card! ========\n"));
 #endif
 	}
 
@@ -262,7 +263,7 @@ dhd_wlan_get_mac_addr(unsigned char *buf, int ifidx)
 	}
 #endif /* EXAMPLE_GET_MAC_VER2 */
 
-	printf("======== %s err=%d ========\n", __FUNCTION__, err);
+	DHD_INFO(("%s err=%d\n", __FUNCTION__, err));
 
 	return err;
 }
@@ -360,7 +361,7 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 	/* Find the wifi node by compatible string rather than hardcoding GPIO numbers */
 	root_node = of_find_compatible_node(NULL, NULL, DHD_DT_COMPAT_ENTRY);
 	if (!root_node) {
-		printf("%s: cannot find device node for %s\n", __FUNCTION__, DHD_DT_COMPAT_ENTRY);
+		DHD_INFO(("cannot find device node for %s\n", DHD_DT_COMPAT_ENTRY));
 		return -1;
 	}
 
@@ -373,32 +374,32 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 		if (pdev_found) {
 			adapter->pdev = pdev_found;
 			dev = &pdev_found->dev;
-			printf("%s: recovered platform device from DT node\n", __FUNCTION__);
+			DHD_INFO(("recovered platform device from DT node\n"));
 		} else {
 			dev = NULL;
-			printf("%s: no platform device for node, will use DT-only GPIO lookup\n", __FUNCTION__);
+			DHD_INFO(("no platform device for node, will use DT-only GPIO lookup\n"));
 		}
 	}
 #else
 	dev = NULL;
 #endif
 
-	printf("======== Get GPIO from DTS node %pOF ========\n", root_node);
+	DHD_INFO(("======== Get GPIO from DTS node %pOF ========\n", root_node));
 
 	/* Try to acquire vmmc regulator if available to control power sequencing */
 	if (dev) {
 		struct regulator *vmmc = devm_regulator_get_optional(dev, "vmmc");
 		if (IS_ERR(vmmc)) {
 			int r = PTR_ERR(vmmc);
-			printf("%s: vmmc regulator not available on device (err=%d)\n", __FUNCTION__, r);
+			DHD_INFO(("vmmc regulator not available on device (err=%d)\n", r));
 			adapter->regulator = NULL;
 		} else if (vmmc == NULL) {
 			/* optional regulator not present */
 			adapter->regulator = NULL;
-			printf("%s: vmmc regulator not present on device\n", __FUNCTION__);
+			DHD_INFO(("vmmc regulator not present on device\n"));
 		} else {
 			adapter->regulator = vmmc;
-			printf("%s: acquired vmmc regulator %p from device\n", __FUNCTION__, vmmc);
+			DHD_INFO(("acquired vmmc regulator %p from device\n", vmmc));
 		}
 	} else {
 		/* Try to find the mmc parent node and acquire regulator from its device */
@@ -410,31 +411,31 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 				struct regulator *vqmmc = devm_regulator_get_optional(&pdev_mmc->dev, "vqmmc");
 				if (!IS_ERR_OR_NULL(vmmc)) {
 					adapter->regulator = vmmc;
-					printf("%s: acquired vmmc regulator %p from MMC parent device\n", __FUNCTION__, vmmc);
+					DHD_INFO(("acquired vmmc regulator %p from MMC parent device\n", vmmc));
 				} else {
-					printf("%s: vmmc regulator not available on MMC parent (err=%ld)\n", __FUNCTION__, PTR_ERR(vmmc));
+					DHD_INFO(("vmmc regulator not available on MMC parent (err=%ld)\n", PTR_ERR(vmmc)));
 					adapter->regulator = NULL;
 				}
 				if (!IS_ERR_OR_NULL(vqmmc)) {
 					adapter->vqmmc = vqmmc;
-					printf("%s: acquired vqmmc regulator %p from MMC parent device\n", __FUNCTION__, vqmmc);
+					DHD_INFO(("acquired vqmmc regulator %p from MMC parent device\n", vqmmc));
 				} else {
-					printf("%s: vqmmc regulator not available on MMC parent (err=%ld)\n", __FUNCTION__, PTR_ERR(vqmmc));
+					DHD_INFO(("vqmmc regulator not available on MMC parent (err=%ld)\n", PTR_ERR(vqmmc)));
 					adapter->vqmmc = NULL;
 				}
 				/* Try to grab mmc host data from parent device if available */
 				adapter->mmc = dev_get_drvdata(&pdev_mmc->dev);
 				if (adapter->mmc)
-					printf("%s: got mmc host %p from parent device\n", __FUNCTION__, adapter->mmc);
+					DHD_INFO(("got mmc host %p from parent device\n", adapter->mmc));
 				else
-					printf("%s: mmc host not available from parent device\n", __FUNCTION__);
+					DHD_INFO(("mmc host not available from parent device\n"));
 			} else {
 				adapter->regulator = NULL;
-				printf("%s: no platform device for parent node, cannot acquire vmmc\n", __FUNCTION__);
+				DHD_INFO(("no platform device for parent node, cannot acquire vmmc\n"));
 			}
 		} else {
 			adapter->regulator = NULL;
-			printf("%s: no parent node, cannot acquire vmmc regulator\n", __FUNCTION__);
+			DHD_INFO(("no parent node, cannot acquire vmmc regulator\n"));
 		}
 	}
 
@@ -447,14 +448,14 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 			gpiod_wl_reg_on = gpio_to_desc(gpio_num);
 			if (IS_ERR(gpiod_wl_reg_on)) {
 				err = PTR_ERR(gpiod_wl_reg_on);
-				printf("%s: gpio_to_desc(wl_reg_on) failed: %d\n", __FUNCTION__, err);
+				DHD_ERROR(("gpio_to_desc(wl_reg_on) failed: %d\n", err));
 				gpiod_wl_reg_on = NULL;
 			} else {
 				gpiod_set_consumer_name(gpiod_wl_reg_on, "WL_REG_ON");
 				adapter->gpio_wl_reg_on = gpio_num;
 			}
 		} else {
-			printf("%s: wl_reg_on not defined in device tree\n", __FUNCTION__);
+			DHD_INFO(("wl_reg_on not defined in device tree\n"));
 		}
 	}
 
@@ -468,7 +469,7 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 			desc = devm_gpiod_get_optional(dev, GPIO_WL_HOST_WAKE_PROPNAME, GPIOD_IN);
 			if (IS_ERR(desc)) {
 				err = PTR_ERR(desc);
-				printf("%s: devm_gpiod_get_optional(WL_HOST_WAKE) failed: %d\n", __FUNCTION__, err);
+				DHD_ERROR(("devm_gpiod_get_optional(WL_HOST_WAKE) failed: %d\n", err));
 				desc = NULL;
 			}
 		}
@@ -479,7 +480,7 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 				desc = gpio_to_desc(gpio_num);
 				if (IS_ERR(desc)) {
 					err = PTR_ERR(desc);
-					printf("%s: gpio_to_desc(wl_host_wake) failed: %d\n", __FUNCTION__, err);
+					DHD_ERROR(("gpio_to_desc(wl_host_wake) failed: %d\n", err));
 					desc = NULL;
 				} else {
 					adapter->gpio_wl_host_wake = gpio_num;
@@ -500,7 +501,7 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 			}
 
 			if (host_oob_irq < 0) {
-				printf("%s: failed to get OOB IRQ for WL_HOST_WAKE: %d\n", __FUNCTION__, host_oob_irq);
+				DHD_ERROR(("failed to get OOB IRQ for WL_HOST_WAKE: %d\n", host_oob_irq));
 				return -1;
 			}
 
@@ -509,13 +510,13 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 			adapter->irq_num = host_oob_irq;
 			adapter->intr_flags = host_oob_irq_flags & IRQF_TRIGGER_MASK;
 		} else {
-			printf("%s: WL_HOST_WAKE not defined in device tree\n", __FUNCTION__);
+			DHD_INFO(("WL_HOST_WAKE not defined in device tree\n"));
 		}
 	}
 #endif /* CUSTOMER_OOB */
 
 	adapter->gpiod_wl_reg_on = gpiod_wl_reg_on;
-	printf("%s: WL_REG_ON descriptor=%p\n", __FUNCTION__, gpiod_wl_reg_on);
+	DHD_INFO(("WL_REG_ON descriptor=%p\n", gpiod_wl_reg_on));
 #endif /* BCMDHD_DTS */#endif /* BCMDHD_DTS */
 
 
@@ -530,14 +531,14 @@ dhd_wlan_deinit_gpio(wifi_adapter_info_t *adapter)
 	 * when the device is unbound. We just need to clear our references.
 	 */
 	if (adapter->gpiod_wl_reg_on) {
-		printf("%s: Clearing WL_REG_ON GPIO descriptor\n", __FUNCTION__);
+		DHD_INFO(("Clearing WL_REG_ON GPIO descriptor\n"));
 		adapter->gpiod_wl_reg_on = NULL;
 	}
 	adapter->gpio_wl_reg_on = -1;
 
 #ifdef CUSTOMER_OOB
 	if (adapter->gpiod_wl_host_wake) {
-		printf("%s: Clearing WL_HOST_WAKE GPIO descriptor\n", __FUNCTION__);
+		DHD_INFO(("Clearing WL_HOST_WAKE GPIO descriptor\n"));
 		adapter->gpiod_wl_host_wake = NULL;
 	}
 	adapter->gpio_wl_host_wake = -1;
@@ -564,8 +565,8 @@ dhd_wlan_init_adapter(wifi_adapter_info_t *adapter)
 #elif defined(BCMDBUS)
 	adapter->bus_type = USB_BUS;
 #endif
-	printf("bus_type=%d, bus_num=%d, slot_num=%d\n",
-		adapter->bus_type, adapter->bus_num, adapter->slot_num);
+	DHD_INFO(("bus_type=%d, bus_num=%d, slot_num=%d\n",
+		adapter->bus_type, adapter->bus_num, adapter->slot_num));
 #endif /* ADAPTER_IDX */
 
 #ifdef DHD_STATIC_IN_DRIVER
