@@ -64,8 +64,11 @@ CONFIG_MACH_PLATFORM := y
 CONFIG_BCMDHD_DTS := y
 CONFIG_BCMDHD_PLATDEV := y
 
+BUILD_DIR ?= ../bcmdhd_build
+$(shell mkdir -p $(BUILD_DIR))
+
 LINUXDIR  = /lib/modules/$(shell uname -r)/build
-PWD = $(shell pwd)
+PWD = $(shell pwd) 
 KVER = $(shell uname -r)
 MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/bcmdhd/
 ARCH = arm64
@@ -498,7 +501,7 @@ endif
 endif
 
 ARCH ?= arm64
-BCMDHD_ROOT = $(src)
+BCMDHD_ROOT = $(src)  # 内核会自动将src设为源码目录，无需修改
 #$(warning "BCMDHD_ROOT=$(BCMDHD_ROOT)")
 EXTRA_CFLAGS = $(DHDCFLAGS)
 EXTRA_CFLAGS += -DDHD_COMPILED=\"$(BCMDHD_ROOT)\"
@@ -516,16 +519,15 @@ all: bcmdhd_pcie bcmdhd_sdio bcmdhd_usb
 
 bcmdhd_pcie:
 	$(warning "building BCMDHD_PCIE..........")
-	$(MAKE) -C $(LINUXDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules CONFIG_BCMDHD=m CONFIG_BCMDHD_PCIE=y
+	$(MAKE) -C $(LINUXDIR) M=$(BUILD_DIR) src=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules CONFIG_BCMDHD=m CONFIG_BCMDHD_PCIE=y
 
 bcmdhd_sdio:
 	$(warning "building BCMDHD_SDIO..........")
-	$(MAKE) -C $(LINUXDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules CONFIG_BCMDHD=m CONFIG_BCMDHD_SDIO=y
+	$(MAKE) -C $(LINUXDIR) M=$(BUILD_DIR) src=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules CONFIG_BCMDHD=m CONFIG_BCMDHD_SDIO=y
 
 bcmdhd_usb:
 	$(warning "building BCMDHD_USB..........")
-	$(MAKE) -C $(LINUXDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules CONFIG_BCMDHD=m CONFIG_BCMDHD_USB=y
+	$(MAKE) -C $(LINUXDIR) M=$(BUILD_DIR) src=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules CONFIG_BCMDHD=m CONFIG_BCMDHD_USB=y
 
 clean:
-	rm -rf *.o *.ko *.mod.c *~ .*.cmd *.o.cmd .*.o.cmd *.mod \
-	Module.symvers modules.order .tmp_versions modules.builtin
+	rm -rf $(BUILD_DIR)
