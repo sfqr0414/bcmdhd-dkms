@@ -1,7 +1,8 @@
 #!/bin/bash
 # Quick verification script: builds SDIO, PCIE and USB variants and writes logs to /tmp
 set -euo pipefail
-ROOT_DIR=$(pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR="${SCRIPT_DIR}"
 LINUXDIR=/home/ubuntu/repo/workspace/linux-6.18.3-build
 LOGDIR=/tmp
 FAIL=0
