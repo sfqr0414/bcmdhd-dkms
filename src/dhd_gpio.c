@@ -69,14 +69,18 @@ static inline void gpiod_set_consumer_name(struct gpio_desc *desc, const char *n
 #ifdef BCMDHD_DTS
 /* This is sample code in dts file.
 bcmdhd_wlan {
-	compatible = "android,bcmdhd_wlan";
-	gpio_wl_reg_on = <&gpio GPIOH_4 GPIO_ACTIVE_HIGH>;
-	gpio_wl_host_wake = <&gpio GPIOZ_15 GPIO_ACTIVE_HIGH>;
+    compatible = "android,bcmdhd_wlan";
+    wl_reg_on-gpios   = <&gpio2 RK_PC5 GPIO_ACTIVE_HIGH>;
+    wl_host_wake-gpios = <&gpio0 RK_PB0 GPIO_ACTIVE_HIGH>;
 };
 */
-#define DHD_DT_COMPAT_ENTRY		"android,bcmdhd_wlan"
-#define GPIO_WL_REG_ON_PROPNAME		"gpio_wl_reg_on"
-#define GPIO_WL_HOST_WAKE_PROPNAME	"gpio_wl_host_wake"
+#define DHD_DT_COMPAT_ENTRY     "android,bcmdhd_wlan"
+/* Connection IDs for gpiod API. 
+  Matches properties with "-gpios" suffix in DTS.
+  Legacy names without "-gpios" are deprecated. 
+*/
+#define GPIO_WL_REG_ON_PROPNAME      "wl_reg_on"
+#define GPIO_WL_HOST_WAKE_PROPNAME   "wl_host_wake"
 #endif
 
 static int
@@ -338,7 +342,7 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 	
 	/* Get GPIO descriptors using gpiod API */
 	if (dev && root_node) {
-		gpiod_wl_reg_on = devm_gpiod_get_optional(dev, "wl_reg_on", GPIOD_OUT_LOW);
+		gpiod_wl_reg_on = devm_gpiod_get_optional(dev, GPIO_WL_REG_ON_PROPNAME, GPIOD_OUT_LOW);
 		if (IS_ERR(gpiod_wl_reg_on)) {
 			err = PTR_ERR(gpiod_wl_reg_on);
 			printf("%s: Failed to get WL_REG_ON GPIO descriptor: %d\n", __FUNCTION__, err);
@@ -350,7 +354,7 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 			adapter->gpio_wl_reg_on = desc_to_gpio(gpiod_wl_reg_on);
 		}
 #ifdef CUSTOMER_OOB
-		gpiod_wl_host_wake = devm_gpiod_get_optional(dev, "wl_host_wake", GPIOD_IN);
+		gpiod_wl_host_wake = devm_gpiod_get_optional(dev, GPIO_WL_HOST_WAKE_PROPNAME, GPIOD_IN);
 		if (IS_ERR(gpiod_wl_host_wake)) {
 			err = PTR_ERR(gpiod_wl_host_wake);
 			printf("%s: Failed to get WL_HOST_WAKE GPIO descriptor: %d\n", __FUNCTION__, err);
@@ -504,11 +508,11 @@ dhd_wlan_get_gpio_number(wifi_adapter_info_t *adapter, const char *gpio_name)
 	if (!adapter || !gpio_name)
 		return -EINVAL;
 
-	if (strcmp(gpio_name, "wl_reg_on") == 0) {
+	if (strcmp(gpio_name, GPIO_WL_REG_ON_PROPNAME) == 0) {
 		return adapter->gpio_wl_reg_on;
 	}
 #ifdef CUSTOMER_OOB
-	else if (strcmp(gpio_name, "wl_host_wake") == 0) {
+	else if (strcmp(gpio_name, GPIO_WL_HOST_WAKE_PROPNAME) == 0) {
 		return adapter->gpio_wl_host_wake;
 	}
 #endif
