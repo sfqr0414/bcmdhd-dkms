@@ -538,30 +538,15 @@ enum dhd_op_flags {
 #endif /* OEM_ANDROID */
 
 #ifndef CONFIG_BCMDHD_FW_PATH
-#ifdef OEM_ANDROID
-#define CONFIG_BCMDHD_FW_PATH  "/system/vendor/etc/wifi/fw_bcmdhd.bin"
-#else
-#define CONFIG_BCMDHD_FW_PATH  "/var/run/rtecdc.bin"
-#endif /* OEM_ANDROID */
+#define CONFIG_BCMDHD_FW_PATH  "/usr/lib/firmware/ap6275p/fw_bcmdhd.bin"
 #endif /* CONFIG_BCMDHD_FW_PATH */
 
 #ifndef CONFIG_BCMDHD_NVRAM_PATH
-#ifdef OEM_ANDROID
-#define CONFIG_BCMDHD_NVRAM_PATH  "/system/vendor/etc/wifi/bcmdhd.cal"
-#else
-#define CONFIG_BCMDHD_NVRAM_PATH  "/var/run/nvram.txt"
-#endif /* OEM_ANDROID */
+#define CONFIG_BCMDHD_NVRAM_PATH  "/usr/lib/firmware/ap6275p/nvram.txt"
 #endif /* CONFIG_BCMDHD_NVRAM_PATH */
 
 #ifndef CONFIG_BCMDHD_CLM_PATH
-#ifdef OEM_ANDROID
-#define CONFIG_BCMDHD_CLM_PATH "/etc/wifi/bcmdhd_clm.blob"
-#elif defined(LINUX) || defined(linux)
-#define CONFIG_BCMDHD_CLM_PATH "/var/run/bcmdhd_clm.blob"
-#else
-/* clm download will fail on empty path */
-#define CONFIG_BCMDHD_CLM_PATH ""
-#endif /* OEM_ANDROID */
+#define CONFIG_BCMDHD_CLM_PATH "/usr/lib/firmware/ap6275p/clm_syn43711a0.blob"
 #endif /* CONFIG_BCMDHD_CLM_PATH */
 
 #ifdef DHD_LINUX_STD_FW_API
@@ -3323,7 +3308,7 @@ extern uint dhd_force_tx_queueing;
 #define WIFI_TURNOFF_DELAY		DEFAULT_WIFI_TURNOFF_DELAY
 #endif /* WIFI_TURNOFF_DELAY */
 
-#define DEFAULT_WIFI_TURNON_DELAY		200
+#define DEFAULT_WIFI_TURNON_DELAY		1000
 #ifndef WIFI_TURNON_DELAY
 #define WIFI_TURNON_DELAY		DEFAULT_WIFI_TURNON_DELAY
 #endif /* WIFI_TURNON_DELAY */

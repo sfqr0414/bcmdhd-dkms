@@ -251,20 +251,83 @@ int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long
 	} else {
 		wifi_clr_adapter_status(adapter, WIFI_STATUS_POWER_ON);
 	}
-#ifdef CONFIG_DTS
+#if defined(CONFIG_DTS) || defined(BCMDHD_DTS)
 	if (on) {
 		printf("======== PULL WL_REG_ON HIGH! ========\n");
-		err = regulator_enable(wifi_regulator);
+		/* Try asserting WL_REG_ON early before regulators as some boards require this */
+		if (adapter && adapter->gpiod_wl_reg_on) {
+			gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 1);
+			msleep(20);
+			printf("%s: WL_REG_ON asserted early (gpio=%d)\n", __FUNCTION__, adapter->gpio_wl_reg_on);
+		}
+		/* Enable regulators (vmmc then vqmmc) */
+		if (adapter && adapter->regulator) {
+			err = regulator_enable(adapter->regulator);
+			if (err < 0) {
+				DHD_ERROR(("%s: regulator_enable(vmmc) failed: %d", __FUNCTION__, err));
+				goto fail;
+			}
+			printf("%s: vmmc regulator enabled\n", __FUNCTION__);
+			/* allow regulator to ramp */
+			msleep(100);
+		} else {
+			printf("%s: vmmc regulator not available, skipping enable\n", __FUNCTION__);
+		}
+		if (adapter && adapter->vqmmc) {
+			err = regulator_enable(adapter->vqmmc);
+			if (err < 0) {
+				DHD_ERROR(("%s: regulator_enable(vqmmc) failed: %d", __FUNCTION__, err));
+				/* try to continue */
+			}
+			printf("%s: vqmmc regulator enabled\n", __FUNCTION__);
+			msleep(100);
+		} else {
+			printf("%s: vqmmc regulator not available, skipping enable\n", __FUNCTION__);
+		}
+
+		/* Report regulators and WL_REG_ON status */
+		if (adapter && adapter->gpiod_wl_reg_on) {
+			printf("%s: WL_REG_ON state (gpio=%d) value=%d\n", __FUNCTION__, adapter->gpio_wl_reg_on,
+				gpiod_get_value_cansleep(adapter->gpiod_wl_reg_on));
+			if (adapter->regulator)
+				printf("%s: vmmc enabled? %d\n", __FUNCTION__, regulator_is_enabled(adapter->regulator));
+			if (adapter->vqmmc)
+				printf("%s: vqmmc enabled? %d\n", __FUNCTION__, regulator_is_enabled(adapter->vqmmc));
+			/* Trigger MMC host detection explicitly when available */
+			if (adapter->mmc) {
+				printf("%s: calling mmc_detect_change for host %p\n", __FUNCTION__, adapter->mmc);
+				mmc_detect_change(adapter->mmc, 0);
+			}
+		} else {
+			printf("%s: WL_REG_ON gpio descriptor missing\n", __FUNCTION__);
+		}
 		is_power_on = TRUE;
 	}
 	else {
 		printf("======== PULL WL_REG_ON LOW! ========\n");
-		err = regulator_disable(wifi_regulator);
+		/* Drive WL_REG_ON low first, then disable vqmmc then vmmc regulators */
+		if (adapter && adapter->gpiod_wl_reg_on) {
+			gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
+		}
+		if (adapter && adapter->vqmmc) {
+			err = regulator_disable(adapter->vqmmc);
+			if (err < 0) {
+				DHD_ERROR(("%s: regulator_disable(vqmmc) failed: %d", __FUNCTION__, err));
+			}
+			printf("%s: vqmmc regulator disabled\n", __FUNCTION__);
+		} else {
+			printf("%s: vqmmc regulator not available, skipping disable\n", __FUNCTION__);
+		}
+		if (adapter && adapter->regulator) {
+			err = regulator_disable(adapter->regulator);
+			if (err < 0) {
+				DHD_ERROR(("%s: regulator_disable(vmmc) failed: %d", __FUNCTION__, err));
+			}
+			printf("%s: vmmc regulator disabled\n", __FUNCTION__);
+		} else {
+			printf("%s: vmmc regulator not available, skipping disable\n", __FUNCTION__);
+		}
 		is_power_on = FALSE;
-	}
-	if (err < 0) {
-		DHD_ERROR(("%s: regulator enable/disable failed", __FUNCTION__));
-		goto fail;
 	}
 #else
 	if (!adapter->wifi_plat_data) {

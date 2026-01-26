@@ -289,6 +289,10 @@ typedef struct wifi_adapter_info {
 #ifdef BCMDHD_PLATDEV
 	struct platform_device *pdev;
 #endif /* BCMDHD_PLATDEV */
+	/* Optional regulators controlling VMMC and VQMMC supplies */
+	struct regulator *regulator; /* VMMC supply */
+	struct regulator *vqmmc;    /* VQMMC supply */
+	struct mmc_host *mmc;       /* MMC host for triggering rescan */
 } wifi_adapter_info_t;
 
 #if defined(CONFIG_WIFI_CONTROL_FUNC)
@@ -297,6 +301,9 @@ typedef struct wifi_adapter_info {
 #include <dhd_plat.h>
 #endif /* CONFIG_WIFI_CONTROL_FUNC */
 
+/* Regulator API for controlling vmmc-supply */
+#include <linux/regulator/consumer.h>/* MMC host control helper */
+#include <linux/mmc/host.h>
 typedef struct bcmdhd_wifi_platdata {
 	uint				num_adapters;
 	wifi_adapter_info_t	*adapters;

@@ -73,8 +73,8 @@ KVER = $(shell uname -r)
 MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/bcmdhd/
 ARCH = arm64
 
-CONFIG_BCMDHD_FW_PATH="/lib/firmware/ap6275p/fw_bcmdhd.bin"
-CONFIG_BCMDHD_NVRAM_PATH="/lib/firmware/ap6275p/nvram.txt"
+CONFIG_BCMDHD_FW_PATH="/usr/lib/firmware/ap6275p/fw_bcmdhd.bin"
+CONFIG_BCMDHD_NVRAM_PATH="/usr/lib/firmware/ap6275p/nvram.txt"
 
 DHDCFLAGS = -Wall -Wstrict-prototypes -Wno-date-time -Wno-strict-prototypes   \
 	-Wno-uninitialized -Wno-unused-but-set-variable -Wno-address	      \
