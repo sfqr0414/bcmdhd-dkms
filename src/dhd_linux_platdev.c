@@ -71,12 +71,16 @@ extern void dhd_wlan_deinit_plat_data(wifi_adapter_info_t *adapter);
 static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev);
 
 #ifdef CONFIG_DTS
-struct regulator *wifi_regulator = NULL;
+/* Regulator control removed: power is managed by mmc-pwrseq */
+/* struct regulator *wifi_regulator = NULL; */
 #endif /* CONFIG_DTS */
 
 bool cfg_multichip = FALSE;
 bcmdhd_wifi_platdata_t *dhd_wifi_platdata = NULL;
 static int wifi_plat_dev_probe_ret = 0;
+/* Logical power state tracked by driver (decoupled from regulator's internal refcount).
+ * This ensures driver acts idempotently and recovers from regulator-disable failures.
+ */
 static bool is_power_on = FALSE;
 /* XXX Some Qualcomm based CUSTOMER_HW4 platforms are using platform
  * device structure even if the Kernel uses device tree structure.
@@ -228,11 +232,41 @@ void* wifi_platform_get_prealloc_func_ptr(wifi_adapter_info_t *adapter)
 
 int wifi_platform_get_irq_number(wifi_adapter_info_t *adapter, unsigned long *irq_flags_ptr)
 {
+	int irq = -1;
+	int trig;
+
 	if (adapter == NULL)
 		return -1;
+
+	/* Prefer standard platform interface if platform device is available */
+	if (adapter->pdev) {
+		irq = platform_get_irq((struct platform_device *)adapter->pdev, 0);
+		if (irq < 0) {
+			irq = platform_get_irq_byname((struct platform_device *)adapter->pdev, "host-wake");
+		}
+		if (irq >= 0) {
+			trig = irq_get_trigger_type(irq);
+			if (trig == IRQ_TYPE_LEVEL_HIGH)
+				adapter->intr_flags = IRQF_TRIGGER_HIGH;
+			else if (trig == IRQ_TYPE_LEVEL_LOW)
+				adapter->intr_flags = IRQF_TRIGGER_LOW;
+			else if (trig == IRQ_TYPE_EDGE_RISING)
+				adapter->intr_flags = IRQF_TRIGGER_RISING;
+			else if (trig == IRQ_TYPE_EDGE_FALLING)
+				adapter->intr_flags = IRQF_TRIGGER_FALLING;
+			else
+				adapter->intr_flags = IRQF_TRIGGER_HIGH; /* reasonable default */
+		}
+	}
+
+	/* Fallback: use whatever the platform/adapter structure indicates */
+	if (irq < 0)
+		irq = adapter->irq_num;
+
 	if (irq_flags_ptr)
 		*irq_flags_ptr = adapter->intr_flags;
-	return adapter->irq_num;
+
+	return irq;
 }
 
 int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long msec)
@@ -253,88 +287,38 @@ int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long
 	}
 #if defined(CONFIG_DTS) || defined(BCMDHD_DTS)
 	if (on) {
-		DHD_INFO(("======== PULL WL_REG_ON HIGH! ========\n"));
-		/* Try asserting WL_REG_ON early before regulators as some boards require this */
-		if (adapter && adapter->gpiod_wl_reg_on) {
-			gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 1);
-			msleep(20);
-			DHD_INFO(("WL_REG_ON asserted early (gpio=%d)\n", adapter->gpio_wl_reg_on));
-		}
-		/* Enable regulators (vmmc then vqmmc) */
-		if (adapter && adapter->regulator) {
-			err = regulator_enable(adapter->regulator);
-			if (err < 0) {
-				DHD_ERROR(("%s: regulator_enable(vmmc) failed: %d", __FUNCTION__, err));
-				goto fail;
-			}
-			DHD_INFO(("vmmc regulator enabled\n"));
-			/* allow regulator to ramp */
-			msleep(100);
-		} else {
-			DHD_INFO(("vmmc regulator not available, skipping enable\n"));
-		}
-		if (adapter && adapter->vqmmc) {
-			err = regulator_enable(adapter->vqmmc);
-			if (err < 0) {
-				DHD_ERROR(("%s: regulator_enable(vqmmc) failed: %d", __FUNCTION__, err));
-				/* try to continue */
-			}
-			DHD_INFO(("vqmmc regulator enabled\n"));
-			msleep(100);
-		} else {
-			DHD_INFO(("vqmmc regulator not available, skipping enable\n"));
+		/* If already logically powered on, skip redundant enable */
+		if (is_power_on) {
+			DHD_INFO(("%s: power already on, skipping enable\n", __FUNCTION__));
+			return 0;
 		}
 
-		/* Report regulators and WL_REG_ON status */
-		if (adapter && adapter->gpiod_wl_reg_on) {
-			DHD_INFO(("WL_REG_ON state (gpio=%d) value=%d\n", adapter->gpio_wl_reg_on,
-				gpiod_get_value_cansleep(adapter->gpiod_wl_reg_on)));
-			if (adapter->regulator)
-				DHD_INFO(("vmmc enabled? %d\n", regulator_is_enabled(adapter->regulator)));
-			if (adapter->vqmmc)
-				DHD_INFO(("vqmmc enabled? %d\n", regulator_is_enabled(adapter->vqmmc)));
-			/* Trigger MMC host detection explicitly when available */
-			if (adapter->mmc) {
-				DHD_INFO(("calling mmc_detect_change for host %p\n", adapter->mmc));
-				mmc_detect_change(adapter->mmc, 0);
-			}
+		DHD_INFO(("Power ON (delegated to board/mmc-pwrseq)\n"));
+		/* WL_REG_ON control deferred to board/mmc-pwrseq */
+
+		/* Power rails are managed by the board (mmc-pwrseq). No regulator control in this driver. */
+		is_power_on = TRUE; /* Mark logical power state */
+
+		/* Power control and WL_REG_ON state are not driven here; defer to mmc-pwrseq */
+		if (adapter && adapter->mmc) {
+			DHD_INFO(("calling mmc_detect_change for host %p\n", adapter->mmc));
+			/* Allow some time for card to stabilize after board-managed power */
+			msleep(200);
+			mmc_detect_change(adapter->mmc, 0);
 		} else {
-			DHD_INFO(("WL_REG_ON gpio descriptor missing\n"));
+			DHD_INFO(("mmc host not available; skipping mmc_detect_change\n"));
 		}
-		is_power_on = TRUE;
 	}
 	else {
-		DHD_INFO(("======== PULL WL_REG_ON LOW! ========\n"));
-		/* Drive WL_REG_ON low first, then disable vqmmc then vmmc regulators */
-		if (adapter && adapter->gpiod_wl_reg_on) {
-			gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
+		/* If already logically powered off, skip redundant disable */
+		if (!is_power_on) {
+			DHD_INFO(("%s: power already off, skipping disable\n", __FUNCTION__));
+			return 0;
 		}
-		if (adapter && adapter->vqmmc) {
-			if (regulator_is_enabled(adapter->vqmmc)) {
-				err = regulator_disable(adapter->vqmmc);
-				if (err < 0) {
-					DHD_ERROR(("regulator_disable(vqmmc) failed: %d", err));
-				}
-				DHD_INFO(("vqmmc regulator disabled\n"));
-			} else {
-				DHD_INFO(("vqmmc regulator not enabled; skipping disable\n"));
-			}
-		} else {
-			DHD_INFO(("vqmmc regulator not available, skipping disable\n"));
-		}
-		if (adapter && adapter->regulator) {
-			if (regulator_is_enabled(adapter->regulator)) {
-				err = regulator_disable(adapter->regulator);
-				if (err < 0) {
-					DHD_ERROR(("regulator_disable(vmmc) failed: %d", err));
-				}
-				DHD_INFO(("vmmc regulator disabled\n"));
-			} else {
-				DHD_INFO(("vmmc regulator not enabled; skipping disable\n"));
-			}
-		} else {
-			DHD_INFO(("vmmc regulator not available, skipping disable\n"));
-		}
+
+		DHD_INFO(("Power OFF (delegated to board/mmc-pwrseq)\n"));
+		/* WL_REG_ON/reset/regulator control deferred to board/mmc-pwrseq */
+		/* Force logical state clear to avoid stuck state */
 		is_power_on = FALSE;
 	}
 #else
@@ -510,11 +494,8 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_DTS
-	wifi_regulator = regulator_get(&pdev->dev, "wlreg_on");
-	if (wifi_regulator == NULL) {
-		DHD_ERROR(("%s regulator is null\n", __FUNCTION__));
-		return -1;
-	}
+	/* Power and reset control moved to mmc-pwrseq / board: do not acquire regulators here */
+	DHD_INFO(("%s: deferring power / WL_REG_ON control to mmc-pwrseq\n", __FUNCTION__));
 
 #if defined(CUSTOMER_OOB)
 	/* This is to get the irq for the OOB */
@@ -548,14 +529,14 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 
 /**
  * Stage 4: Platform shutdown hook to ensure clean WiFi module state on reboot
- * This forces WL_REG_ON low during system shutdown/reboot to prevent hot reboot issues.
- * Hot reboots can leave the WiFi module in an inconsistent state if WL_REG_ON remains high.
+ * Delegate power control to board/mmc-pwrseq during shutdown to avoid driving
+ * WL_REG_ON directly from the driver which could conflict with platform logic.
  */
 static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 {
 	wifi_adapter_info_t *adapter;
 	
-	DHD_ERROR(("%s: Platform shutdown - forcing WL_REG_ON low for clean reboot\n", __FUNCTION__));
+	DHD_INFO(("%s: Platform shutdown - delegating power control to mmc-pwrseq/board\n", __FUNCTION__));
 	
 	/* Android style wifi platform data device ("bcmdhd_wlan" or "bcm4329_wlan")
 	 * is kept for backward compatibility and supports only 1 adapter
@@ -572,9 +553,7 @@ static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 	
 	adapter = &dhd_wifi_platdata->adapters[0];
 	
-	/* Force power off to ensure WL_REG_ON is driven low
-	 * This prevents hot reboot issues where the module remains powered
-	 */
+	/* Request logical shutdown (driver-side state). Physical WL_REG_ON is board-managed. */
 	if (is_power_on) {
 		DHD_ERROR(("%s: Forcing WiFi power off for shutdown\n", __FUNCTION__));
 #ifdef BCMPCIE
@@ -588,16 +567,8 @@ static void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 #endif /* BCMPCIE */
 	}
 	
-	/* Ensure WL_REG_ON GPIO is explicitly driven low for shutdown */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
-	if (adapter->gpiod_wl_reg_on) {
-		gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
-		DHD_ERROR(("%s: WL_REG_ON explicitly set to LOW via gpiod\n", __FUNCTION__));
-	}
-#else
-	/* Kernel version < 4.5.0 does not support gpiod API */
-	DHD_ERROR(("%s: gpiod API not available, relying on platform power-off sequence\n", __FUNCTION__));
-#endif
+	/* WL_REG_ON is managed by board/mmc-pwrseq; driver will not drive it during shutdown */
+	DHD_INFO(("%s: WL_REG_ON control delegated to board/mmc-pwrseq\n", __FUNCTION__));
 	
 	DHD_ERROR(("%s: Platform shutdown complete\n", __FUNCTION__));
 }
@@ -622,9 +593,7 @@ static int wifi_plat_dev_drv_remove(struct platform_device *pdev)
 #endif /* BCMPCIE */
 	}
 
-#ifdef CONFIG_DTS
-	regulator_put(wifi_regulator);
-#endif /* CONFIG_DTS */
+	/* No regulator was acquired by this driver; power resources are managed by mmc-pwrseq */
 #ifdef BCMDHD_PLATDEV
 	dhd_wlan_deinit_plat_data(adapter);
 #endif

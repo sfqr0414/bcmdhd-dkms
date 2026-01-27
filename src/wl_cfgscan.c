@@ -348,6 +348,7 @@ s32 wl_inform_single_bss(struct bcm_cfg80211 *cfg, wl_bss_info_v109_t *bi, bool 
 	s32 signal;
 	u32 freq;
 	s32 err = 0;
+	struct wl_ie *ie = wl_to_ie(cfg);
 	gfp_t aflags;
 	u8 tmp_buf[IEEE80211_MAX_SSID_LEN + 1];
 	u32 ssid_len_from_ie = 0;
@@ -426,8 +427,17 @@ s32 wl_inform_single_bss(struct bcm_cfg80211 *cfg, wl_bss_info_v109_t *bi, bool 
 		goto out_err;
 	}
 	wl_mrg_ie(cfg, ((u8 *) bi) + bi->ie_offset, bi->ie_length);
-	wl_cp_ie(cfg, beacon_proberesp->variable, WL_BSS_INFO_MAX -
-		offsetof(struct wl_cfg80211_bss_info, frame_buf));
+	{
+		/* Copy ie buffer into beacon_proberesp variable using offset-based pointer to avoid field-spanning warnings */
+		u32 ie_len = wl_get_ielen(cfg);
+		u32 dst_max = WL_BSS_INFO_MAX - offsetof(struct wl_cfg80211_bss_info, frame_buf);
+		if (unlikely(ie_len > dst_max)) {
+			WL_ERR(("dst_size is not enough\n"));
+			err = -ENOSPC;
+			goto out_err;
+		}
+		memcpy((char *)beacon_proberesp + offsetof(struct beacon_proberesp, variable), &ie->buf[0], ie_len);
+	}
 	notif_bss_info->frame_len = offsetof(struct ieee80211_mgmt,
 		u.beacon.variable) + wl_get_ielen(cfg);
 	freq = wl_channel_to_frequency(notif_bss_info->channel, notif_bss_info->band);

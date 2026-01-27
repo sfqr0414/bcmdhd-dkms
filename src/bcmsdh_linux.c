@@ -437,10 +437,14 @@ int bcmsdh_oob_intr_register(bcmsdh_info_t *bcmsdh, bcmsdh_cb_fn_t oob_irq_handl
 	bcmsdh_osinfo->oob_irq_enabled = TRUE;
 	bcmsdh_osinfo->oob_irq_registered = TRUE;
 #if defined(CONFIG_ARCH_ODIN)
+	/* Ensure level-high threaded handling flags for mainline kernel */
+	bcmsdh_osinfo->oob_irq_flags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
 	err = odin_gpio_sms_request_irq(bcmsdh_osinfo->oob_irq_num, wlan_oob_irq,
 		bcmsdh_osinfo->oob_irq_flags, "bcmsdh_sdmmc", bcmsdh);
 #else
-	err = request_irq(bcmsdh_osinfo->oob_irq_num, wlan_oob_irq,
+	/* Use a threaded IRQ for level-triggered OOB to ensure proper clearing (ONESHOT required) */
+	bcmsdh_osinfo->oob_irq_flags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
+	err = request_threaded_irq(bcmsdh_osinfo->oob_irq_num, NULL, wlan_oob_irq,
 		bcmsdh_osinfo->oob_irq_flags, "bcmsdh_sdmmc", bcmsdh);
 #endif /* defined(CONFIG_ARCH_ODIN) */
 	if (err) {

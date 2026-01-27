@@ -1,3 +1,9 @@
+bcmdhd (101.10.591.52.27-6) stable; urgency=medium
+
+  * adapt to mainline linux 6.18.3
+
+ -- Jianfeng Liu <sfqr0414@gmail.com>  Tue, 27 Jan 2026 14:02:00 +0800
+
 bcmdhd (101.10.591.52.27-5) stable; urgency=medium
 
   * fix api change of del_timer since v6.15

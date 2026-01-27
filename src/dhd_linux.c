@@ -23865,9 +23865,8 @@ void wifi_plat_dev_drv_shutdown(struct platform_device *pdev)
 	if (!adapter) {
 		adapter = dhd_wifi_platform_get_adapter(PCI_BUS, 0, 0);
 	}
-	if (adapter && adapter->gpiod_wl_reg_on) {
-		DHD_ERROR(("%s: Setting WL_REG_ON to LOW for safe shutdown\n", __FUNCTION__));
-		gpiod_set_value_cansleep(adapter->gpiod_wl_reg_on, 0);
+	if (adapter) {
+		DHD_ERROR(("%s: WL_REG_ON managed by mmc-pwrseq/board; driver will not drive it during shutdown\n", __FUNCTION__));
 	}
 }
 #endif /* DHD_WIFI_SHUTDOWN */

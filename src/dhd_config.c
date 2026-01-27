@@ -3063,6 +3063,7 @@ dhd_conf_mkeep_alive(dhd_pub_t *dhd, int ifidx, int id, int period,
 	int ret = 0, len_bytes=0, buf_len=0;
 	char *buf = NULL, *iovar_buf = NULL;
 	uint8 *pdata;
+	char *data_ptr = NULL;
 
 	CONFIG_TRACE("id=%d, period=%d, packet=%s\n", id, period, packet);
 	if (period >= 0) {
@@ -3083,16 +3084,17 @@ dhd_conf_mkeep_alive(dhd_pub_t *dhd, int ifidx, int id, int period,
 		buf_len += WL_MKEEP_ALIVE_FIXED_LEN;
 		mkeep_alive_pktp->period_msec = period;
 		if (packet && strlen(packet)) {
-			len_bytes = wl_pattern_atoh(packet, (char *)mkeep_alive_pktp->data);
+			/* use offset-based pointer to avoid field-spanning memcpy warnings */
+			data_ptr = (char *)mkeep_alive_pktp + WL_MKEEP_ALIVE_FIXED_LEN;
+			len_bytes = wl_pattern_atoh(packet, data_ptr);
 			buf_len += len_bytes;
 			if (bcast) {
-				memcpy(mkeep_alive_pktp->data, &ether_bcast, ETHER_ADDR_LEN);
+				memcpy(data_ptr, &ether_bcast, ETHER_ADDR_LEN);
 			}
 			ret = dhd_conf_get_iovar(dhd, ifidx, WLC_GET_VAR, "cur_etheraddr",
 				iovar_buf, WLC_IOCTL_SMLEN);
 			if (!ret) {
-				pdata = mkeep_alive_pktp->data;
-				memcpy(pdata+6, iovar_buf, ETHER_ADDR_LEN);
+				memcpy(data_ptr + 6, iovar_buf, ETHER_ADDR_LEN);
 			}
 		}
 		mkeep_alive_pktp->len_bytes = htod16(len_bytes);

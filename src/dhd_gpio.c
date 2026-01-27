@@ -89,96 +89,9 @@ bcmdhd_wlan {
 static int
 dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 {
-	struct gpio_desc *gpiod_wl_reg_on = adapter->gpiod_wl_reg_on;
-	int err = 0;
-
-	if (on) {
-		DHD_INFO(("======== PULL WL_REG_ON HIGH! ========\n"));
-		/* Prefer GPIO if available */
-		if (gpiod_wl_reg_on) {
-			gpiod_set_value_cansleep(gpiod_wl_reg_on, 1);
-		} else if (adapter && (adapter->regulator || adapter->vqmmc)) {
-			/* Fallback: use regulator(s) to power the module when GPIO is not present */
-			if (adapter->regulator) {
-				err = regulator_enable(adapter->regulator);
-				if (err < 0) {
-					DHD_ERROR(("regulator_enable(vmmc) failed: %d\n", err));
-					return err;
-				}
-				DHD_INFO(("vmmc regulator enabled\n"));
-			}
-			if (adapter->vqmmc) {
-				int r = regulator_enable(adapter->vqmmc);
-				if (r < 0)
-					DHD_ERROR(("regulator_enable(vqmmc) failed: %d (continuing)\n", r));
-				else
-					DHD_INFO(("vqmmc regulator enabled\n"));
-			}
-			/* Give rails time to stabilize */
-			msleep(50);
-		} else {
-			DHD_ERROR(("no WL_REG_ON gpio or regulators available to power on\n"));
-			return -ENODEV;
-		}
-		/* Standardized power sequence: wait for module to power up */
-		mdelay(20);
-#ifdef BUS_POWER_RESTORE
-#ifdef BCMPCIE
-		if (adapter->pci_dev) {
-			mdelay(100);
-			DHD_INFO(("======== pci_set_power_state PCI_D0! ========\n"));
-			pci_set_power_state(adapter->pci_dev, PCI_D0);
-			if (adapter->pci_saved_state)
-				pci_load_and_free_saved_state(adapter->pci_dev, &adapter->pci_saved_state);
-			pci_restore_state(adapter->pci_dev);
-			err = pci_enable_device(adapter->pci_dev);
-			if (err < 0)
-				DHD_ERROR(("PCI enable device failed\n"));
-			pci_set_master(adapter->pci_dev);
-		}
-#endif /* BCMPCIE */
-#endif /* BUS_POWER_RESTORE */
-		/* Lets customer power to get stable */
-	} else {
-#ifdef BUS_POWER_RESTORE
-#ifdef BCMPCIE
-		if (adapter->pci_dev) {
-			DHD_INFO(("======== pci_set_power_state PCI_D3hot! ========\n"));
-			pci_save_state(adapter->pci_dev);
-			adapter->pci_saved_state = pci_store_saved_state(adapter->pci_dev);
-			if (pci_is_enabled(adapter->pci_dev))
-				pci_disable_device(adapter->pci_dev);
-			pci_set_power_state(adapter->pci_dev, PCI_D3hot);
-		}
-#endif /* BCMPCIE */
-#endif /* BUS_POWER_RESTORE */
-		DHD_INFO(("======== PULL WL_REG_ON LOW! ========\n"));
-		if (gpiod_wl_reg_on) {
-			gpiod_set_value_cansleep(gpiod_wl_reg_on, 0);
-		} else if (adapter && (adapter->regulator || adapter->vqmmc)) {
-			/* Power off using regulators */
-			if (adapter->vqmmc) {
-				int r = regulator_disable(adapter->vqmmc);
-				if (r < 0)
-					DHD_ERROR(("regulator_disable(vqmmc) failed: %d\n", r));
-				else
-					DHD_INFO(("vqmmc regulator disabled\n"));
-			}
-			if (adapter->regulator) {
-				int r = regulator_disable(adapter->regulator);
-				if (r < 0)
-					DHD_ERROR(("regulator_disable(vmmc) failed: %d\n", r));
-				else
-					DHD_INFO(("vmmc regulator disabled\n"));
-			}
-		} else {
-			DHD_ERROR(("no WL_REG_ON gpio or regulators available to power off\n"));
-		}
-		/* Standardized power sequence: wait for module to power down */
-		mdelay(20);
-	}
-
-	return err;
+	DHD_INFO(("%s: [Vendor Logic] Power %s (managed by mmc-pwrseq)\n", __FUNCTION__, on ? "ON" : "OFF"));
+	/* Physical power operations removed; board/mmc-pwrseq manages rails */
+	return 0;
 }
 
 static int
@@ -336,29 +249,24 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 #endif
 	int err = 0;
 	struct gpio_desc *gpiod_wl_reg_on = NULL;
-#ifdef CUSTOMER_OOB
-	struct gpio_desc *gpiod_wl_host_wake = NULL;
+struct gpio_desc *gpiod_wl_host_wake = NULL;
 	int host_oob_irq = -1;
 	uint host_oob_irq_flags = 0;
-#ifdef CUSTOMER_HW_ROCKCHIP
-#ifdef HW_OOB
+	#ifdef CUSTOMER_HW_ROCKCHIP
+	#ifdef HW_OOB
 	int irq_flags = -1;
-#endif
-#endif
-#endif
+	#endif
+	#endif
 	struct device *dev = NULL;
 
 	/* Initialize legacy GPIO numbers to invalid */
 	adapter->gpio_wl_reg_on = -1;
-#ifdef CUSTOMER_OOB
-	adapter->gpio_wl_host_wake = -1;
-#endif
+adapter->gpio_wl_host_wake = -1;
 
 	/* Please check your schematic and fill right GPIO number which connected to
 	* WL_REG_ON and WL_HOST_WAKE.
 	*/
-#ifdef BCMDHD_DTS
-	/* Find the wifi node by compatible string rather than hardcoding GPIO numbers */
+/* Find the wifi node by compatible string rather than hardcoding GPIO numbers */
 	root_node = of_find_compatible_node(NULL, NULL, DHD_DT_COMPAT_ENTRY);
 	if (!root_node) {
 		DHD_INFO(("cannot find device node for %s\n", DHD_DT_COMPAT_ENTRY));
@@ -386,80 +294,30 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 
 	DHD_INFO(("======== Get GPIO from DTS node %pOF ========\n", root_node));
 
-	/* Try to acquire vmmc regulator if available to control power sequencing */
-	if (dev) {
-		struct regulator *vmmc = devm_regulator_get_optional(dev, "vmmc");
-		if (IS_ERR(vmmc)) {
-			int r = PTR_ERR(vmmc);
-			DHD_INFO(("vmmc regulator not available on device (err=%d)\n", r));
-			adapter->regulator = NULL;
-		} else if (vmmc == NULL) {
-			/* optional regulator not present */
-			adapter->regulator = NULL;
-			DHD_INFO(("vmmc regulator not present on device\n"));
-		} else {
-			adapter->regulator = vmmc;
-			DHD_INFO(("acquired vmmc regulator %p from device\n", vmmc));
-		}
-	} else {
-		/* Try to find the mmc parent node and acquire regulator from its device */
+	/* Power supplies and WL_REG_ON is managed by the board (mmc-pwrseq); do not acquire regulators or drive WL_REG_ON */
+	DHD_INFO(("DTS: power & WL_REG_ON managed by mmc-pwrseq; skipping regulator and WL_REG_ON acquisition\n"));
+
+	/* Try to find mmc parent to obtain mmc host data only */
+	{
 		struct device_node *parent = root_node ? root_node->parent : NULL;
 		if (parent) {
 			struct platform_device *pdev_mmc = of_find_device_by_node(parent);
 			if (pdev_mmc) {
-				struct regulator *vmmc = devm_regulator_get_optional(&pdev_mmc->dev, "vmmc");
-				struct regulator *vqmmc = devm_regulator_get_optional(&pdev_mmc->dev, "vqmmc");
-				if (!IS_ERR_OR_NULL(vmmc)) {
-					adapter->regulator = vmmc;
-					DHD_INFO(("acquired vmmc regulator %p from MMC parent device\n", vmmc));
-				} else {
-					DHD_INFO(("vmmc regulator not available on MMC parent (err=%ld)\n", PTR_ERR(vmmc)));
-					adapter->regulator = NULL;
-				}
-				if (!IS_ERR_OR_NULL(vqmmc)) {
-					adapter->vqmmc = vqmmc;
-					DHD_INFO(("acquired vqmmc regulator %p from MMC parent device\n", vqmmc));
-				} else {
-					DHD_INFO(("vqmmc regulator not available on MMC parent (err=%ld)\n", PTR_ERR(vqmmc)));
-					adapter->vqmmc = NULL;
-				}
-				/* Try to grab mmc host data from parent device if available */
 				adapter->mmc = dev_get_drvdata(&pdev_mmc->dev);
 				if (adapter->mmc)
 					DHD_INFO(("got mmc host %p from parent device\n", adapter->mmc));
 				else
 					DHD_INFO(("mmc host not available from parent device\n"));
 			} else {
-				adapter->regulator = NULL;
-				DHD_INFO(("no platform device for parent node, cannot acquire vmmc\n"));
+				DHD_INFO(("no platform device for parent node, cannot acquire mmc parent\n"));
 			}
 		} else {
-			adapter->regulator = NULL;
-			DHD_INFO(("no parent node, cannot acquire vmmc regulator\n"));
+			DHD_INFO(("no parent node, cannot acquire mmc parent\n"));
 		}
 	}
 
-	/* WL_REG_ON: avoid using devm_gpiod_get to bypass vmmc-supply conflicts
-	 * Prefer of_get_named_gpio + gpio_to_desc so we don't clash with vmmc-supply
-	 */
-	{
-		int gpio_num = of_get_named_gpio(root_node, GPIO_WL_REG_ON_PROPNAME "-gpios", 0);
-		if (gpio_is_valid(gpio_num)) {
-			gpiod_wl_reg_on = gpio_to_desc(gpio_num);
-			if (IS_ERR(gpiod_wl_reg_on)) {
-				err = PTR_ERR(gpiod_wl_reg_on);
-				DHD_ERROR(("gpio_to_desc(wl_reg_on) failed: %d\n", err));
-				gpiod_wl_reg_on = NULL;
-			} else {
-				gpiod_set_consumer_name(gpiod_wl_reg_on, "WL_REG_ON");
-				adapter->gpio_wl_reg_on = gpio_num;
-			}
-		} else {
-			DHD_INFO(("wl_reg_on not defined in device tree\n"));
-		}
-	}
-
-#ifdef CUSTOMER_OOB
+	/* WL_REG_ON descriptor not configured by driver; board manages it */
+	DHD_INFO(("WL_REG_ON descriptor not configured by driver (board/mmc-pwrseq manages it)\n"));
 	/* WL_HOST_WAKE: try device-managed descriptor first, then DT lookup; ensure we can get a valid IRQ */
 	{
 		struct gpio_desc *desc = NULL;
@@ -505,6 +363,9 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 				return -1;
 			}
 
+			/* Log IRQ registration for easier dmesg verification */
+			DHD_INFO(("Registered OOB IRQ %d for WL_HOST_WAKE\n", host_oob_irq));
+
 			/* Default shared/edge flags; platform may override later */
 			host_oob_irq_flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE | IORESOURCE_IRQ_SHAREABLE;
 			adapter->irq_num = host_oob_irq;
@@ -513,11 +374,8 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 			DHD_INFO(("WL_HOST_WAKE not defined in device tree\n"));
 		}
 	}
-#endif /* CUSTOMER_OOB */
 
-	adapter->gpiod_wl_reg_on = gpiod_wl_reg_on;
-	DHD_INFO(("WL_REG_ON descriptor=%p\n", gpiod_wl_reg_on));
-#endif /* BCMDHD_DTS */#endif /* BCMDHD_DTS */
+	DHD_INFO(("WL_REG_ON descriptor not configured by driver (board/mmc-pwrseq manages it)\n"));
 
 
 
@@ -527,13 +385,8 @@ dhd_wlan_init_gpio(wifi_adapter_info_t *adapter)
 static void
 dhd_wlan_deinit_gpio(wifi_adapter_info_t *adapter)
 {
-	/* GPIOs obtained via devm_gpiod_get_optional are automatically freed
-	 * when the device is unbound. We just need to clear our references.
-	 */
-	if (adapter->gpiod_wl_reg_on) {
-		DHD_INFO(("Clearing WL_REG_ON GPIO descriptor\n"));
-		adapter->gpiod_wl_reg_on = NULL;
-	}
+	/* WL_REG_ON descriptor is not managed by driver; nothing to free here */
+	DHD_INFO(("dhd_wlan_deinit_gpio: WL_REG_ON managed by mmc-pwrseq/board\n"));
 	adapter->gpio_wl_reg_on = -1;
 
 #ifdef CUSTOMER_OOB

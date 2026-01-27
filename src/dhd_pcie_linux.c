@@ -2890,16 +2890,12 @@ int dhdpcie_oob_intr_register(dhd_bus_t *bus)
 		printf("%s OOB irq=%d flags=0x%X\n", __FUNCTION__,
 			(int)dhdpcie_osinfo->oob_irq_num,
 			(int)dhdpcie_osinfo->oob_irq_flags);
-#ifdef DHD_USE_PCIE_OOB_THREADED_IRQ
-		err = request_threaded_irq(dhdpcie_osinfo->oob_irq_num,
-			wlan_oob_irq_isr, wlan_oob_irq,
+	/* Force level-high threaded IRQ mode with ONESHOT to comply with mainline clearing semantics */
+	dhdpcie_osinfo->oob_irq_flags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
+	err = request_threaded_irq(dhdpcie_osinfo->oob_irq_num,
+			NULL, wlan_oob_irq,
 			dhdpcie_osinfo->oob_irq_flags, "dhdpcie_host_wake",
 			bus);
-#else
-		err = request_irq(dhdpcie_osinfo->oob_irq_num, wlan_oob_irq,
-			dhdpcie_osinfo->oob_irq_flags, "dhdpcie_host_wake",
-			bus);
-#endif /* DHD_USE_THREADED_IRQ_PCIE_OOB */
 		if (err) {
 			DHD_ERROR(("%s: request_irq failed with %d\n",
 				__FUNCTION__, err));

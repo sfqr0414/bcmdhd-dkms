@@ -80,8 +80,9 @@ dhd_wifi_deinit_gpio(void)
 		DHD_INFO(("WL_REG_ON on-step-2 : [%d]\n",
 			gpio_get_value(wlan_reg_on)));
 	}
-	gpio_free(wlan_host_wake_up);
-	gpio_free(wlan_reg_on);
+	/* Do not free GPIOs owned/managed by board/mmc-pwrseq */
+	/* gpio_free(wlan_host_wake_up);
+	gpio_free(wlan_reg_on); */
 }
 
 int
@@ -106,69 +107,49 @@ dhd_wifi_init_gpio(void)
 	DHD_INFO(("%s: gpio_wlan_power : %d\n", __FUNCTION__, wlan_reg_on));
 
 	/*
-	 * For reg_on, gpio_request will fail if the gpio is configured to output-high
-	 * in the dts using gpio-hog, so do not return error for failure.
+	 * Power/WL_REG_ON are handled by board/mmc-pwrseq: do not claim the GPIO here.
+	 * Reading the state is safe; do NOT request, set direction, or drive the pin.
 	 */
-	if (gpio_request_one(wlan_reg_on, GPIOF_DIR_OUT, "WL_REG_ON")) {
-		DHD_ERROR(("%s: Failed to request gpio %d for WL_REG_ON, "
-			"might have configured in the dts\n",
-			__FUNCTION__, wlan_reg_on));
-	} else {
-		DHD_ERROR(("%s: gpio_request WL_REG_ON done - WLAN_EN: GPIO %d\n",
-			__FUNCTION__, wlan_reg_on));
+	DHD_INFO(("%s: deferring WL_REG_ON control to board/mmc-pwrseq (gpio %d)\n",
+		__FUNCTION__, wlan_reg_on));
+
+	gpio_reg_on_val = -1;
+	if (gpio_is_valid(wlan_reg_on)) {
+		/* Safe to read, but do not claim or change the gpio */
+		gpio_reg_on_val = gpio_get_value(wlan_reg_on);
+		DHD_INFO(("%s: WL_REG_ON state read as %d (not driven by driver)\n",
+			__FUNCTION__, gpio_reg_on_val));
 	}
 
-	gpio_reg_on_val = gpio_get_value(wlan_reg_on);
-	DHD_ERROR(("%s: Initial WL_REG_ON: [%d]\n",
-		__FUNCTION__, gpio_get_value(wlan_reg_on)));
-
 	if (gpio_reg_on_val == 0) {
-		DHD_INFO(("%s: WL_REG_ON is LOW, drive it HIGH\n", __FUNCTION__));
-		if (gpio_direction_output(wlan_reg_on, 1)) {
-			DHD_ERROR(("%s: WL_REG_ON is failed to pull up\n", __FUNCTION__));
-			return -EIO;
-		}
-		/* Wait for WIFI_TURNON_DELAY due to power stability */
+		DHD_INFO(("%s: WL_REG_ON is LOW (read only), waiting %d ms for board to stabilize\n",
+			__FUNCTION__, WIFI_TURNON_DELAY));
 		msleep(WIFI_TURNON_DELAY);
 
-		/*
-		 * Call Kiric RC ATU fixup else si_attach will fail due to
-		 * improper BAR0/1 address translations
-		 */
-		if (kirin_pcie_power_on_atu_fixup) {
+		/* Kirin fixup can still be called without driving GPIO */
+		if (kirin_pcie_power_on_atu_fixup)
 			kirin_pcie_power_on_atu_fixup();
-		} else {
-			DHD_ERROR(("[%s] kirin_pcie_power_on_atu_fixup is NULL. "
-				"REG_ON may not work\n", __func__));
-		}
-		/* Enable ASPM after powering ON */
-		if (kirin_pcie_lp_ctrl) {
+		if (kirin_pcie_lp_ctrl)
 			kirin_pcie_lp_ctrl(1);
-		} else {
-			DHD_ERROR(("[%s] kirin_pcie_lp_ctrl is NULL. "
-				"ASPM may not work\n", __func__));
-		}
 	}
 
 	/* ========== WLAN_HOST_WAKE ============ */
 	DHD_INFO(("%s: gpio_wlan_host_wake : %d\n", __FUNCTION__, wlan_host_wake_up));
 
-	if (gpio_request_one(wlan_host_wake_up, GPIOF_IN, "WLAN_HOST_WAKE")) {
-		DHD_ERROR(("%s: Failed to request gpio %d for WLAN_HOST_WAKE\n",
-			__FUNCTION__, wlan_host_wake_up));
-			return -ENODEV;
-	} else {
-		DHD_ERROR(("%s: gpio_request WLAN_HOST_WAKE done"
-			" - WLAN_HOST_WAKE: GPIO %d\n",
-			__FUNCTION__, wlan_host_wake_up));
+	/* Do NOT request or drive the host-wake GPIO; it is managed by board/DT/mmc-pwrseq.
+	 * If the GPIO is valid, we can obtain its IRQ mapping but do not change the pin state.
+	 */
+	if (!gpio_is_valid(wlan_host_wake_up)) {
+		DHD_ERROR(("%s: WLAN_HOST_WAKE gpio %d not valid\n", __FUNCTION__, wlan_host_wake_up));
+		return -ENODEV;
 	}
 
-	if (gpio_direction_input(wlan_host_wake_up)) {
-		DHD_ERROR(("%s: Failed to set WL_HOST_WAKE gpio direction\n", __FUNCTION__));
-		return -EIO;
-	}
+	DHD_INFO(("%s: deferring WLAN_HOST_WAKE management to board (gpio %d).\n",
+		__FUNCTION__, wlan_host_wake_up));
 
+	/* Compute IRQ number for host-wake without claiming the gpio */
 	wlan_host_wake_irq = gpio_to_irq(wlan_host_wake_up);
+	DHD_INFO(("%s: computed host-wake irq %d\n", __FUNCTION__, wlan_host_wake_irq));
 
 	return 0;
 }

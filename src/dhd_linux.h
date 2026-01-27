@@ -265,7 +265,8 @@ typedef struct wifi_adapter_info {
 	uint		slot_num;
 	int			index;
 	/* GPIO descriptor API (Linux 6.18.3+) - preferred */
-	struct gpio_desc *gpiod_wl_reg_on;
+	/* WL_REG_ON GPIO descriptor removed: power managed by mmc-pwrseq */
+	/* struct gpio_desc *gpiod_wl_reg_on; */
 #ifdef CUSTOMER_OOB
 	struct gpio_desc *gpiod_wl_host_wake;
 #endif
@@ -289,9 +290,9 @@ typedef struct wifi_adapter_info {
 #ifdef BCMDHD_PLATDEV
 	struct platform_device *pdev;
 #endif /* BCMDHD_PLATDEV */
-	/* Optional regulators controlling VMMC and VQMMC supplies */
-	struct regulator *regulator; /* VMMC supply */
-	struct regulator *vqmmc;    /* VQMMC supply */
+	/* Optional regulators controlling VMMC and VQMMC supplies - removed to defer to mmc-pwrseq */
+	/* struct regulator *regulator;  VMMC supply */
+	/* struct regulator *vqmmc;     VQMMC supply */
 	struct mmc_host *mmc;       /* MMC host for triggering rescan */
 } wifi_adapter_info_t;
 

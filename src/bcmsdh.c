@@ -974,8 +974,8 @@ bcmsdh_cache_gpio_descriptors(bcmsdh_info_t *sdh, void *adapter_info)
 		return;
 	}
 
-	/* Cache WL_REG_ON GPIO descriptor for hot-path access */
-	sdh->cached_gpiod_wl_reg_on = adapter->gpiod_wl_reg_on;
+	/* WL_REG_ON is managed by mmc-pwrseq/board; cached descriptor not used */
+	sdh->cached_gpiod_wl_reg_on = NULL;
 	
 #ifdef CUSTOMER_OOB
 	/* Cache WL_HOST_WAKE GPIO descriptor for interrupt handling */
