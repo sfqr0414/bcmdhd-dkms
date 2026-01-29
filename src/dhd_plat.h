@@ -35,8 +35,8 @@
 #define WLAN_PLAT_AP_FLAG	0x02
 struct wifi_platform_data {
 	int (*set_power)(int val, wifi_adapter_info_t *adapter);
-	int (*set_reset)(int val);
-	int (*set_carddetect)(int val);
+	int (*set_reset)(int val, wifi_adapter_info_t *adapter);
+	int (*set_carddetect)(int val, wifi_adapter_info_t *adapter);
 #ifdef DHD_COREDUMP
 	int (*set_coredump)(const char *buf, int buf_len, const char *info);
 #endif /* DHD_COREDUMP */

@@ -48,6 +48,12 @@
 #include<linux/regulator/consumer.h>
 #include<linux/of_gpio.h>
 #endif /* CONFIG_DTS */
+/* MMC/SDIO headers for controller matching and card detection */
+#if defined(BCMSDIO) && defined(BCMDHD_DTS)
+#include <linux/mmc/host.h>
+#include <linux/sdhci.h>
+#include <linux/mmc/card.h>
+#endif /* BCMSDIO && BCMDHD_DTS */
 /* Stage 4: Include for GPIO descriptor support in shutdown hook */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
 #include <linux/gpio/consumer.h>
@@ -141,6 +147,57 @@ extern bool check_bcm4335_rev(void);
 #define PCIE_RC_VENDOR_ID 0xffff
 #define PCIE_RC_DEVICE_ID 0xffff
 #endif /* CONFIG_X86 */
+
+/* SDIO card detection function (platform device layer) */
+#if defined(BCMSDIO)
+int dhd_wlan_set_carddetect(int present, wifi_adapter_info_t *adapter)
+{
+	int err = 0;
+	struct sdhci_host *sdio_host = NULL;
+
+	/* Validate adapter and mmc_host */
+	if (!adapter) {
+		DHD_ERROR(("%s: adapter is NULL\n", __FUNCTION__));
+		return -ENODEV;
+	}
+
+	if (!adapter->mmc) {
+		DHD_ERROR(("%s: adapter->mmc is NULL, cannot perform card detection\n", __FUNCTION__));
+		return -ENODEV;
+	}
+
+	/* Extract sdhci_host from mmc_host */
+	sdio_host = (struct sdhci_host *)adapter->mmc->private_data;
+	if (!sdio_host) {
+		DHD_ERROR(("%s: sdhci_host is NULL\n", __FUNCTION__));
+		return -ENODEV;
+	}
+
+	/* Perform actual SDIO card detection via sdhci */
+	if (present) {
+		DHD_INFO(("======== Card detection to detect SDIO card! ========\n"));
+		err = sdhci_force_presence_change(sdio_host, 1);
+	} else {
+		DHD_INFO(("======== Card detection to remove SDIO card! ========\n"));
+		err = sdhci_force_presence_change(sdio_host, 0);
+	}
+
+	DHD_INFO(("%s: carddetect present=%d, result=%d\n", __FUNCTION__, present, err));
+	return err;
+}
+#else /* !BCMSDIO */
+int dhd_wlan_set_carddetect(int present, wifi_adapter_info_t *adapter)
+{
+#if defined(BCMPCIE)
+	if (present) {
+		DHD_INFO(("======== Card detection to detect PCIE card! ========\n"));
+	} else {
+		DHD_INFO(("======== Card detection to remove PCIE card! ========\n"));
+	}
+#endif
+	return 0;
+}
+#endif /* BCMSDIO */
 
 wifi_adapter_info_t* dhd_wifi_platform_attach_adapter(uint32 bus_type,
 	uint32 bus_num, uint32 slot_num, unsigned long status)
@@ -476,6 +533,62 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 
 #ifdef BCMDHD_PLATDEV
 	adapter->pdev = pdev;
+	
+	/* Initialize adapter->mmc to NULL */
+	adapter->mmc = NULL;
+	
+	/* MMC/SDIO controller auto-matching for RK3588 WiFi (SDIO mode + DT enabled) */
+#if defined(BCMSDIO) && defined(BCMDHD_DTS)
+	{
+		struct mmc_host *mmc_host = NULL;
+		struct device_node *mmc_dt_node = NULL;
+		unsigned int bus_width = 0;
+		int mmc_idx = 0;
+		bool found = false;
+		
+		DHD_INFO(("%s: Starting MMC/SDIO controller auto-matching\n", __FUNCTION__));
+		
+		/* Iterate through all mmc_host instances */
+		mmc_for_each_host(mmc_idx, mmc_host) {
+			if (!mmc_host || !mmc_host->of_node) {
+				continue;
+			}
+			
+			mmc_dt_node = mmc_host->of_node;
+			
+			/* Check for RK3588 WiFi SDIO controller characteristics:
+			 * 1. cap-sdio-irq (mandatory)
+			 * 2. no-sd (mandatory)
+			 * 3. no-mmc (mandatory)
+			 * 4. bus-width = 4 (mandatory)
+			 */
+			if (!of_property_read_bool(mmc_dt_node, "cap-sdio-irq")) {
+				continue;
+			}
+			if (!of_property_read_bool(mmc_dt_node, "no-sd")) {
+				continue;
+			}
+			if (!of_property_read_bool(mmc_dt_node, "no-mmc")) {
+				continue;
+			}
+			if (of_property_read_u32(mmc_dt_node, "bus-width", &bus_width) || bus_width != 4) {
+				continue;
+			}
+			
+			/* All characteristics matched - this is the WiFi SDIO controller */
+			adapter->mmc = mmc_host;
+			found = true;
+			DHD_INFO(("%s: Matched MMC host %p (DT node: %pOF)\n", 
+				__FUNCTION__, mmc_host, mmc_dt_node));
+			break;
+		}
+		
+		if (!found) {
+			DHD_ERROR(("%s: Failed to match WiFi SDIO controller\n", __FUNCTION__));
+		}
+	}
+#endif /* BCMSDIO && BCMDHD_DTS */
+	
 	wifi_plat_dev_probe_ret = dhd_wlan_init_plat_data(adapter);
 	if (!wifi_plat_dev_probe_ret)
 		wifi_plat_dev_probe_ret = dhd_wifi_platform_load();

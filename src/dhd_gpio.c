@@ -11,6 +11,12 @@
 #warning "GPIO descriptor API not available, falling back to legacy GPIO API"
 #endif
 #include <linux/delay.h>
+/* Headers for sysfs-based GPIO control */
+#include <linux/gpio/driver.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+#include <linux/wait.h>
+#include <linux/sched.h>
 
 #ifdef BCMDHD_DTS
 #include <linux/of_gpio.h>
@@ -51,12 +57,20 @@ static inline void gpiod_set_consumer_name(struct gpio_desc *desc, const char *n
 	/* No-op for compatibility */
 }
 
+static inline int gpiod_is_valid(const struct gpio_desc *desc)
+{
+	return desc && !IS_ERR(desc);
+}
+
 /* Define GPIOD flags for compilation */
 #ifndef GPIOD_OUT_LOW
 #define GPIOD_OUT_LOW 0
 #endif
 #ifndef GPIOD_IN
 #define GPIOD_IN 0
+#endif
+#ifndef GPIOD_ASIS
+#define GPIOD_ASIS 0
 #endif
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) */
 
@@ -86,48 +100,124 @@ bcmdhd_wlan {
 #define GPIO_WL_HOST_WAKE_PROPNAME   "wl_host_wake"
 #endif
 
+/* Internal sysfs-based GPIO control function (static, internal use only) */
+static int __gpio_sysfs_set_value(struct gpio_desc *desc, int value)
+{
+	struct file *fp = NULL;
+	char path[64];
+	char val_str[2];
+	loff_t pos = 0;
+	int gpio_num;
+	int ret = 0;
+	int retry;
+	mm_segment_t old_fs;
+
+	if (!desc || IS_ERR(desc)) {
+		DHD_ERROR(("%s: invalid gpio_desc\n", __FUNCTION__));
+		return -EINVAL;
+	}
+
+	gpio_num = desc_to_gpio(desc);
+	if (gpio_num < 0) {
+		DHD_ERROR(("%s: failed to get GPIO number from descriptor\n", __FUNCTION__));
+		return -ENODEV;
+	}
+
+	/* Build sysfs path dynamically */
+	snprintf(path, sizeof(path), "/sys/class/gpio/gpio%u/value", gpio_num);
+	val_str[0] = value ? '1' : '0';
+	val_str[1] = '\n';
+
+	/* Retry mechanism for sysfs node creation delay */
+	for (retry = 0; retry < 3; retry++) {
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		
+		fp = filp_open(path, O_WRONLY, 0);
+		set_fs(old_fs);
+		
+		if (!IS_ERR(fp)) {
+			break;
+		}
+		
+		if (retry < 2) {
+			DHD_WARN(("%s: sysfs node %s not ready, retry %d/3\n", 
+				__FUNCTION__, path, retry + 1));
+			msleep(10);
+		}
+	}
+
+	if (IS_ERR(fp)) {
+		ret = PTR_ERR(fp);
+		DHD_ERROR(("%s: failed to open %s: %d\n", __FUNCTION__, path, ret));
+		return ret;
+	}
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = kernel_write(fp, val_str, 2, &pos);
+	set_fs(old_fs);
+
+	if (ret < 0) {
+		DHD_ERROR(("%s: failed to write to %s: %d\n", __FUNCTION__, path, ret));
+	} else {
+		ret = 0;  /* Success */
+	}
+
+	filp_close(fp, NULL);
+	return ret;
+}
+
 static int
 dhd_wlan_set_power(int on, wifi_adapter_info_t *adapter)
 {
-	DHD_INFO(("%s: [Vendor Logic] Power %s (managed by mmc-pwrseq)\n", __FUNCTION__, on ? "ON" : "OFF"));
-	/* Physical power operations removed; board/mmc-pwrseq manages rails */
-	return 0;
-}
+	int ret = 0;
 
-static int
-dhd_wlan_set_reset(int onoff)
-{
-	return 0;
-}
-
-static int
-dhd_wlan_set_carddetect(int present)
-{
-	int err = 0;
-
-	if (present) {
-#if defined(BCMSDIO)
-		DHD_INFO(("======== Card detection to detect SDIO card! ========\n"));
-#ifdef CUSTOMER_HW_PLATFORM
-		err = sdhci_force_presence_change(&sdmmc_channel, 1);
-#endif /* CUSTOMER_HW_PLATFORM */
-/* platform-specific card-detect removed; rely on standard sdhci presence change */
-#elif defined(BCMPCIE)
-		DHD_INFO(("======== Card detection to detect PCIE card! ========\n"));
-#endif
-	} else {
-#if defined(BCMSDIO)
-		DHD_INFO(("======== Card detection to remove SDIO card! ========\n"));
-#ifdef CUSTOMER_HW_PLATFORM
-		err = sdhci_force_presence_change(&sdmmc_channel, 0);
-#endif /* CUSTOMER_HW_PLATFORM */
-/* platform-specific card-detect removed; rely on standard sdhci presence change */
-#elif defined(BCMPCIE)
-		DHD_INFO(("======== Card detection to remove PCIE card! ========\n"));
-#endif
+	if (!adapter || !adapter->gpiod_wl_reg_on) {
+		DHD_ERROR(("%s: invalid adapter or WL_REG_ON GPIO not available\n", __FUNCTION__));
+		return -ENODEV;
 	}
 
-	return err;
+	DHD_INFO(("%s: Power %s via sysfs GPIO control\n", __FUNCTION__, on ? "ON" : "OFF"));
+
+	ret = __gpio_sysfs_set_value(adapter->gpiod_wl_reg_on, on);
+	if (ret < 0) {
+		DHD_ERROR(("%s: failed to set WL_REG_ON to %d: %d\n", __FUNCTION__, on, ret));
+		return ret;
+	}
+
+	/* Hardware timing requirement for power-on */
+	if (on) {
+		usleep_range(200, 300);
+	}
+
+	DHD_INFO(("%s: WL_REG_ON set to %d successfully\n", __FUNCTION__, on));
+	return 0;
+}
+
+static int
+dhd_wlan_set_reset(int onoff, wifi_adapter_info_t *adapter)
+{
+	int ret = 0;
+
+	if (!adapter || !adapter->gpiod_wl_reg_on) {
+		DHD_ERROR(("%s: invalid adapter or WL_REG_ON GPIO not available\n", __FUNCTION__));
+		return -ENODEV;
+	}
+
+	DHD_INFO(("%s: Reset %s via sysfs GPIO control\n", __FUNCTION__, onoff ? "ON" : "OFF"));
+
+	ret = __gpio_sysfs_set_value(adapter->gpiod_wl_reg_on, onoff);
+	if (ret < 0) {
+		DHD_ERROR(("%s: failed to set WL_REG_ON to %d: %d\n", __FUNCTION__, onoff, ret));
+		return ret;
+	}
+
+	/* Hardware timing requirement for reset */
+	usleep_range(100, 200);
+
+	DHD_INFO(("%s: WL_REG_ON set to %d successfully\n", __FUNCTION__, onoff));
+	return 0;
 }
 
 static int
@@ -229,6 +319,9 @@ static void *dhd_wlan_get_country_code(char *ccode
 	return NULL;
 }
 
+/* Forward declaration: dhd_wlan_set_carddetect implemented in dhd_linux_platdev.c */
+extern int dhd_wlan_set_carddetect(int present, wifi_adapter_info_t *adapter);
+
 struct wifi_platform_data dhd_wlan_control = {
 	.set_power	= dhd_wlan_set_power,
 	.set_reset	= dhd_wlan_set_reset,
@@ -294,30 +387,57 @@ adapter->gpio_wl_host_wake = -1;
 
 	DHD_INFO(("======== Get GPIO from DTS node %pOF ========\n", root_node));
 
-	/* Power supplies and WL_REG_ON is managed by the board (mmc-pwrseq); do not acquire regulators or drive WL_REG_ON */
-	DHD_INFO(("DTS: power & WL_REG_ON managed by mmc-pwrseq; skipping regulator and WL_REG_ON acquisition\n"));
-
-	/* Try to find mmc parent to obtain mmc host data only */
+	/* WL_REG_ON GPIO: Parse with GPIOD_ASIS (no request, no direction set) to avoid conflict with mmc-pwrseq */
 	{
-		struct device_node *parent = root_node ? root_node->parent : NULL;
-		if (parent) {
-			struct platform_device *pdev_mmc = of_find_device_by_node(parent);
-			if (pdev_mmc) {
-				adapter->mmc = dev_get_drvdata(&pdev_mmc->dev);
-				if (adapter->mmc)
-					DHD_INFO(("got mmc host %p from parent device\n", adapter->mmc));
-				else
-					DHD_INFO(("mmc host not available from parent device\n"));
-			} else {
-				DHD_INFO(("no platform device for parent node, cannot acquire mmc parent\n"));
+		struct gpio_desc *desc = NULL;
+		int gpio_num = -1;
+		
+		/* Try device-managed descriptor with GPIOD_ASIS flag */
+		if (dev) {
+			desc = devm_gpiod_get_optional(dev, GPIO_WL_REG_ON_PROPNAME, GPIOD_ASIS);
+			if (IS_ERR(desc)) {
+				int err = PTR_ERR(desc);
+				DHD_WARN(("devm_gpiod_get_optional(WL_REG_ON) with GPIOD_ASIS failed: %d\n", err));
+				desc = NULL;
 			}
+		}
+		
+		/* Fallback to DT lookup using gpio_to_desc */
+		if (!desc) {
+			gpio_num = of_get_named_gpio(root_node, GPIO_WL_REG_ON_PROPNAME "-gpios", 0);
+			if (gpio_is_valid(gpio_num)) {
+				desc = gpio_to_desc(gpio_num);
+				if (IS_ERR(desc)) {
+					DHD_ERROR(("gpio_to_desc(wl_reg_on) failed: %ld\n", PTR_ERR(desc)));
+					desc = NULL;
+				} else {
+					adapter->gpio_wl_reg_on = gpio_num;
+					DHD_INFO(("WL_REG_ON GPIO number: %d (from DT fallback)\n", gpio_num));
+				}
+			} else {
+				DHD_WARN(("WL_REG_ON GPIO not found in device tree\n"));
+			}
+		}
+		
+		/* Validate and store the descriptor */
+		if (desc) {
+			#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+			if (!gpiod_is_valid(desc)) {
+				DHD_ERROR(("WL_REG_ON GPIO descriptor is invalid\n"));
+				adapter->gpiod_wl_reg_on = NULL;
+				return -EINVAL;
+			}
+			#endif
+			
+			gpiod_set_consumer_name(desc, "WL_REG_ON");
+			adapter->gpiod_wl_reg_on = desc;
+			DHD_INFO(("WL_REG_ON GPIO descriptor parsed (GPIOD_ASIS, no request/direction set)\n"));
 		} else {
-			DHD_INFO(("no parent node, cannot acquire mmc parent\n"));
+			DHD_INFO(("WL_REG_ON GPIO descriptor not available; power managed by mmc-pwrseq\n"));
+			adapter->gpiod_wl_reg_on = NULL;
 		}
 	}
 
-	/* WL_REG_ON descriptor not configured by driver; board manages it */
-	DHD_INFO(("WL_REG_ON descriptor not configured by driver (board/mmc-pwrseq manages it)\n"));
 	/* WL_HOST_WAKE: try device-managed descriptor first, then DT lookup; ensure we can get a valid IRQ */
 	{
 		struct gpio_desc *desc = NULL;
@@ -375,18 +495,17 @@ adapter->gpio_wl_host_wake = -1;
 		}
 	}
 
-	DHD_INFO(("WL_REG_ON descriptor not configured by driver (board/mmc-pwrseq manages it)\n"));
-
-
-
 	return 0;
 }
 
 static void
 dhd_wlan_deinit_gpio(wifi_adapter_info_t *adapter)
 {
-	/* WL_REG_ON descriptor is not managed by driver; nothing to free here */
-	DHD_INFO(("dhd_wlan_deinit_gpio: WL_REG_ON managed by mmc-pwrseq/board\n"));
+	/* WL_REG_ON: Clear descriptor reference only, no hardware operations */
+	if (adapter->gpiod_wl_reg_on) {
+		DHD_INFO(("Clearing WL_REG_ON GPIO descriptor (no hardware operation)\n"));
+		adapter->gpiod_wl_reg_on = NULL;
+	}
 	adapter->gpio_wl_reg_on = -1;
 
 #ifdef CUSTOMER_OOB
