@@ -440,7 +440,7 @@ int wifi_platform_bus_enumerate(wifi_adapter_info_t *adapter, bool device_presen
 
 	DHD_ERROR(("%s device present %d\n", __FUNCTION__, device_present));
 	if (plat_data->set_carddetect) {
-		err = plat_data->set_carddetect(device_present);
+		err = plat_data->set_carddetect(device_present, adapter);
 	}
 	return err;
 
@@ -540,21 +540,20 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 	/* MMC/SDIO controller auto-matching for RK3588 WiFi (SDIO mode + DT enabled) */
 #if defined(BCMSDIO) && defined(BCMDHD_DTS)
 	{
-		struct mmc_host *mmc_host = NULL;
 		struct device_node *mmc_dt_node = NULL;
 		unsigned int bus_width = 0;
-		int mmc_idx = 0;
 		bool found = false;
 		
 		DHD_INFO(("%s: Starting MMC/SDIO controller auto-matching\n", __FUNCTION__));
 		
-		/* Iterate through all mmc_host instances */
-		mmc_for_each_host(mmc_idx, mmc_host) {
-			if (!mmc_host || !mmc_host->of_node) {
+		/* Search for MMC controller node with RK3588 WiFi SDIO characteristics in device tree */
+		for_each_compatible_node(mmc_dt_node, NULL, "rockchip,rk3588-dw-mshc") {
+			struct platform_device *pdev_mmc = NULL;
+			struct mmc_host *mmc_host = NULL;
+			
+			if (!mmc_dt_node) {
 				continue;
 			}
-			
-			mmc_dt_node = mmc_host->of_node;
 			
 			/* Check for RK3588 WiFi SDIO controller characteristics:
 			 * 1. cap-sdio-irq (mandatory)
@@ -575,12 +574,20 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 				continue;
 			}
 			
-			/* All characteristics matched - this is the WiFi SDIO controller */
-			adapter->mmc = mmc_host;
-			found = true;
-			DHD_INFO(("%s: Matched MMC host %p (DT node: %pOF)\n", 
-				__FUNCTION__, mmc_host, mmc_dt_node));
-			break;
+			/* Get platform device and mmc_host from matched DT node */
+			pdev_mmc = of_find_device_by_node(mmc_dt_node);
+			if (pdev_mmc) {
+				mmc_host = platform_get_drvdata(pdev_mmc);
+				if (mmc_host) {
+					/* All characteristics matched - this is the WiFi SDIO controller */
+					adapter->mmc = mmc_host;
+					found = true;
+					DHD_INFO(("%s: Matched MMC host %p (DT node: %pOF)\n", 
+						__FUNCTION__, mmc_host, mmc_dt_node));
+					of_node_put(mmc_dt_node);
+					break;
+				}
+			}
 		}
 		
 		if (!found) {

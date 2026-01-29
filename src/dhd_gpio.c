@@ -57,11 +57,6 @@ static inline void gpiod_set_consumer_name(struct gpio_desc *desc, const char *n
 	/* No-op for compatibility */
 }
 
-static inline int gpiod_is_valid(const struct gpio_desc *desc)
-{
-	return desc && !IS_ERR(desc);
-}
-
 /* Define GPIOD flags for compilation */
 #ifndef GPIOD_OUT_LOW
 #define GPIOD_OUT_LOW 0
@@ -110,7 +105,6 @@ static int __gpio_sysfs_set_value(struct gpio_desc *desc, int value)
 	int gpio_num;
 	int ret = 0;
 	int retry;
-	mm_segment_t old_fs;
 
 	if (!desc || IS_ERR(desc)) {
 		DHD_ERROR(("%s: invalid gpio_desc\n", __FUNCTION__));
@@ -130,11 +124,7 @@ static int __gpio_sysfs_set_value(struct gpio_desc *desc, int value)
 
 	/* Retry mechanism for sysfs node creation delay */
 	for (retry = 0; retry < 3; retry++) {
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		
 		fp = filp_open(path, O_WRONLY, 0);
-		set_fs(old_fs);
 		
 		if (!IS_ERR(fp)) {
 			break;
@@ -153,10 +143,8 @@ static int __gpio_sysfs_set_value(struct gpio_desc *desc, int value)
 		return ret;
 	}
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
+	/* Use kernel_write which handles address space internally in modern kernels */
 	ret = kernel_write(fp, val_str, 2, &pos);
-	set_fs(old_fs);
 
 	if (ret < 0) {
 		DHD_ERROR(("%s: failed to write to %s: %d\n", __FUNCTION__, path, ret));
@@ -421,13 +409,12 @@ adapter->gpio_wl_host_wake = -1;
 		
 		/* Validate and store the descriptor */
 		if (desc) {
-			#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
-			if (!gpiod_is_valid(desc)) {
+			/* Check if descriptor is valid using IS_ERR_OR_NULL */
+			if (IS_ERR_OR_NULL(desc)) {
 				DHD_ERROR(("WL_REG_ON GPIO descriptor is invalid\n"));
 				adapter->gpiod_wl_reg_on = NULL;
 				return -EINVAL;
 			}
-			#endif
 			
 			gpiod_set_consumer_name(desc, "WL_REG_ON");
 			adapter->gpiod_wl_reg_on = desc;
