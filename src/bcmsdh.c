@@ -974,16 +974,17 @@ bcmsdh_cache_gpio_descriptors(bcmsdh_info_t *sdh, void *adapter_info)
 		return;
 	}
 
-	/* WL_REG_ON is managed by mmc-pwrseq/board; cached descriptor not used */
-	sdh->cached_gpiod_wl_reg_on = NULL;
+	/* Cache WL_REG_ON GPIO descriptor for bcmsdh layer usage (parsed with GPIOD_ASIS) */
+	sdh->cached_gpiod_wl_reg_on = adapter->gpiod_wl_reg_on;
 	
 #ifdef CUSTOMER_OOB
 	/* Cache WL_HOST_WAKE GPIO descriptor for interrupt handling */
 	sdh->cached_gpiod_wl_host_wake = adapter->gpiod_wl_host_wake;
 #endif
 
-	BCMSDH_INFO(("%s: Cached GPIO descriptors - WL_REG_ON=%p\n",
-		__FUNCTION__, sdh->cached_gpiod_wl_reg_on));
+	BCMSDH_INFO(("%s: Cached GPIO descriptors - WL_REG_ON=%p, WL_HOST_WAKE=%p\n",
+		__FUNCTION__, sdh->cached_gpiod_wl_reg_on, 
+		sdh->cached_gpiod_wl_host_wake ? sdh->cached_gpiod_wl_host_wake : NULL));
 }
 
 /**
