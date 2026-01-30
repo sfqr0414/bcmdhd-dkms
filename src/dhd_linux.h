@@ -265,8 +265,7 @@ typedef struct wifi_adapter_info {
 	uint		slot_num;
 	int			index;
 	/* GPIO descriptor API (Linux 6.18.3+) - preferred */
-	/* WL_REG_ON GPIO descriptor removed: power managed by mmc-pwrseq */
-	/* struct gpio_desc *gpiod_wl_reg_on; */
+	struct gpio_desc *gpiod_wl_reg_on;  /* WL_REG_ON GPIO descriptor (parsed with GPIOD_ASIS) */
 #ifdef CUSTOMER_OOB
 	struct gpio_desc *gpiod_wl_host_wake;
 #endif
