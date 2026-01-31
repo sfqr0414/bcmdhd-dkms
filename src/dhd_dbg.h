@@ -105,6 +105,10 @@ do {	\
 /* !defined(DHD_LOG_DUMP cases) */
 #define DHD_ERROR(args)		do {if (dhd_msg_level & DHD_ERROR_VAL) printf args;} while (0)
 #define DHD_INFO(args)		do {if (dhd_msg_level & DHD_INFO_VAL) printf args;} while (0)
+/* Warn-level logging: map to INFO-level bit by default */
+#ifndef DHD_WARN
+#define DHD_WARN(args)		do {if (dhd_msg_level & DHD_INFO_VAL) printf args;} while (0)
+#endif
 #define DHD_ERROR_ROAM(args)	DHD_ERROR(args)
 #endif /* DHD_LOG_DUMP */
 

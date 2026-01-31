@@ -1693,6 +1693,9 @@ dhdpcie_pci_shutdown(struct pci_dev *pdev)
 	/* Disable IRQ */
 	dhdpcie_disable_irq(bus);
 	/* Kill dpc */
+	/* Ensure DPC up_cnt cleared to prevent warning during teardown */
+	bus->dhd->thr_dpc_ctl.up_cnt = 0;
+	smp_wmb();
 	dhd_dpc_kill(bus->dhd);
 	/* Stop RPM timer */
 	DHD_STOP_RPM_TIMER(bus->dhd);

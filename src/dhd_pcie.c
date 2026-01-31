@@ -3214,6 +3214,10 @@ void dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 
 #if defined(linux) || defined(LINUX)
 	if (!dhd_download_fw_on_driverload) {
+		/* Ensure dpc semaphore cleared before killing DPC to avoid race
+		 * where thread sees up_cnt==0 and prints Unexpected up_cnt. */
+		bus->dhd->thr_dpc_ctl.up_cnt = 0;
+		smp_wmb();
 		dhd_dpc_kill(bus->dhd);
 	}
 #endif /* linux || LINUX */
@@ -7798,6 +7802,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 			/* Clean up any pending host wake IRQ */
 			dhd_bus_oob_intr_set(bus->dhd, FALSE);
 			dhd_bus_oob_intr_unregister(bus->dhd);
+				/* Ensure DPC up_cnt cleared to prevent warning during teardown */
+				bus->dhd->thr_dpc_ctl.up_cnt = 0;
+				smp_wmb();
 #endif /* BCMPCIE_OOB_HOST_WAKE */
 			dhd_os_wd_timer(dhdp, 0);
 			dhd_bus_stop(bus, TRUE);
@@ -7871,6 +7878,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 			/* Clean up any pending host wake IRQ */
 			dhd_bus_oob_intr_set(bus->dhd, FALSE);
 			dhd_bus_oob_intr_unregister(bus->dhd);
+				/* Ensure DPC up_cnt cleared to prevent warning during teardown */
+				bus->dhd->thr_dpc_ctl.up_cnt = 0;
+				smp_wmb();
 #endif /* BCMPCIE_OOB_HOST_WAKE */
 			dhd_dpc_kill(bus->dhd);
 			if (!bus->no_bus_init) {

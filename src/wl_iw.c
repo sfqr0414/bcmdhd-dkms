@@ -38,6 +38,9 @@
 #include <bcmendian.h>
 #include <ethernet.h>
 
+/* Needed to check cfg80211 driver state */
+#include "wl_cfg80211.h"
+
 #include <linux/if_arp.h>
 #include <asm/uaccess.h>
 #include <wlioctl.h>
@@ -632,6 +635,12 @@ wl_iw_set_freq(
 	WL_TRACE(("%s: SIOCSIWFREQ\n", dev->name));
 	DHD_CHECK(dhd, dev);
 	wext_info = dhd->wext_info;
+	/* if cfg80211 is handling connection, silently ignore WEXT sets */
+	{
+		struct bcm_cfg80211 *cfg = wl_get_cfg(dev);
+		if (cfg && (wl_get_drv_status(cfg, CONNECTING, dev) || wl_get_drv_status(cfg, CONNECTED, dev)))
+			return 0;
+	}
 
 	/* Setting by channel number */
 	if (fwrq->e == 0 && fwrq->m < MAXCHANNEL) {
@@ -1070,6 +1079,12 @@ wl_iw_set_wap(
 	WL_TRACE(("%s: SIOCSIWAP\n", dev->name));
 	DHD_CHECK(dhd, dev);
 	wext_info = dhd->wext_info;
+	/* if cfg80211 is handling connection, silently ignore WEXT sets */
+	{
+		struct bcm_cfg80211 *cfg = wl_get_cfg(dev);
+		if (cfg && (wl_get_drv_status(cfg, CONNECTING, dev) || wl_get_drv_status(cfg, CONNECTED, dev)))
+			return 0;
+	}
 	if (wrqu->ap_addr.sa_family != ARPHRD_ETHER) {
 		WL_ERROR(("Invalid Header...sa_family\n"));
 		return -EINVAL;
@@ -1960,6 +1975,12 @@ wl_iw_set_essid(
 	WL_TRACE(("%s: SIOCSIWESSID\n", dev->name));
 	DHD_CHECK(dhd, dev);
 	wext_info = dhd->wext_info;
+	/* if cfg80211 is handling connection, silently ignore WEXT sets */
+	{
+		struct bcm_cfg80211 *cfg = wl_get_cfg(dev);
+		if (cfg && (wl_get_drv_status(cfg, CONNECTING, dev) || wl_get_drv_status(cfg, CONNECTED, dev)))
+			return 0;
+	}
 
 	/* default Broadcast SSID */
 	memset(&ssid, 0, sizeof(ssid));

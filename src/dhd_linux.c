@@ -4873,12 +4873,10 @@ dhd_dpc_thread(void *data)
 			dhd_sched_policy(dhd_dpc_prio);
 #endif /* ENABLE_ADAPTIVE_SCHED */
 			SMP_RD_BARRIER_DEPENDS();
-			if (tsk->terminated) {
-				DHD_OS_WAKE_UNLOCK(&dhd->pub);
-				break;
-			}
-
-			/* Call bus dpc unless it indicated down (then clean stop) */
+				/* If the thread is being stopped via kthread or via the tsk ctl,
+				 * exit silently without printing warnings about up_cnt.
+				 */
+				if (tsk->terminated || kthread_should_stop()) { DHD_OS_WAKE_UNLOCK(&dhd->pub); break; }
 			if (dhd->pub.busstate != DHD_BUS_DOWN) {
 #ifdef DEBUG_DPC_THREAD_WATCHDOG
 				int resched_cnt = 0;
@@ -14378,6 +14376,9 @@ void dhd_detach(dhd_pub_t *dhdp)
 	tasklet_kill(&dhd->tasklet);
 #else
 	if (dhd->dhd_state & DHD_ATTACH_STATE_THREADS_CREATED) {
+		/* Hold SD lock during thread teardown to prevent concurrent bus ops */
+		dhd_os_sdlock(dhdp);
+
 		if (dhd->thr_wdt_ctl.thr_pid >= 0) {
 			PROC_STOP(&dhd->thr_wdt_ctl);
 		}
@@ -14387,11 +14388,17 @@ void dhd_detach(dhd_pub_t *dhdp)
 		}
 
 		if (dhd->thr_dpc_ctl.thr_pid >= 0) {
+			/* Ensure dpc semaphore up_cnt is cleared so the thread will not
+			 * emit an unexpected up_cnt warning while we are tearing down. */
+			dhd->thr_dpc_ctl.up_cnt = 0;
+			smp_wmb();
 			PROC_STOP(&dhd->thr_dpc_ctl);
 		} else
 		{
 			tasklet_kill(&dhd->tasklet);
 		}
+
+		dhd_os_sdunlock(dhdp);
 	}
 #endif /* BCMDBUS */
 

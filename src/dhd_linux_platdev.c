@@ -51,7 +51,29 @@
 /* MMC/SDIO headers for controller matching and card detection */
 #if defined(BCMSDIO) && defined(BCMDHD_DTS)
 #include <linux/mmc/host.h>
+/* Device tree helpers needed for DT-based MMC matching */
+#include <linux/of.h>
+#include <linux/of_platform.h>
+#include <linux/of_device.h>
+
+/* NOTE: DT iteration helpers were moved closer to usage to avoid exposing helper macros
+ * at the top-level include area which could pollute other compilation units.
+ */
+/* Try to include the sdhci header; some kernels expose it under different paths */
+#if defined(__has_include)
+# if __has_include(<linux/sdhci.h>)
+#  include <linux/sdhci.h>
+# elif __has_include(<linux/mmc/sdhci.h>)
+#  include <linux/mmc/sdhci.h>
+# else
+/* Forward declare minimal sdhci symbols used by this driver when header is missing */
+struct sdhci_host;
+int sdhci_force_presence_change(struct sdhci_host *host, int present);
+# endif
+#else
+/* Fallback: try the common header name and otherwise provide forward declarations */
 #include <linux/sdhci.h>
+#endif
 #include <linux/mmc/card.h>
 #endif /* BCMSDIO && BCMDHD_DTS */
 /* Stage 4: Include for GPIO descriptor support in shutdown hook */
@@ -150,10 +172,19 @@ extern bool check_bcm4335_rev(void);
 
 /* SDIO card detection function (platform device layer) */
 #if defined(BCMSDIO)
+/* Helper: return next compatible node and release previous node reference.
+ * Defined at file scope (static) so it has internal linkage and doesn't
+ * pollute other translation units.
+ */
+
+
 int dhd_wlan_set_carddetect(int present, wifi_adapter_info_t *adapter)
 {
 	int err = 0;
 	struct sdhci_host *sdio_host = NULL;
+
+	/* Diagnostic entry log to ensure we capture calls to this function */
+	DHD_ERROR(("%s: ENTER present=%d adapter=%p\n", __FUNCTION__, present, (void *)adapter));
 
 	/* Validate adapter and mmc_host */
 	if (!adapter) {
@@ -162,27 +193,73 @@ int dhd_wlan_set_carddetect(int present, wifi_adapter_info_t *adapter)
 	}
 
 	if (!adapter->mmc) {
-		DHD_ERROR(("%s: adapter->mmc is NULL, cannot perform card detection\n", __FUNCTION__));
-		return -ENODEV;
+		DHD_ERROR(("%s: adapter->mmc is NULL, attempting DT auto-match for MMC host\n", __FUNCTION__));
+		/* Try to lazily match an MMC host via device tree (RK3588 characteristics) */
+		#if defined(BCMSDIO) && defined(BCMDHD_DTS)
+		{
+
+			struct device_node *mmc_dt_node = NULL;
+			unsigned int bus_width = 0;
+			bool found = false;
+
+			/* Use kernel-provided iteration helper to avoid refcount mistakes */
+			for_each_compatible_node(mmc_dt_node, NULL, "rockchip,rk3588-dw-mshc") {
+				struct platform_device *pdev_mmc = NULL;
+				struct mmc_host *mmc_host = NULL;
+
+				if (!of_property_read_bool(mmc_dt_node, "cap-sdio-irq"))
+					continue;
+				if (!of_property_read_bool(mmc_dt_node, "no-sd"))
+					continue;
+				if (!of_property_read_bool(mmc_dt_node, "no-mmc"))
+					continue;
+				if (of_property_read_u32(mmc_dt_node, "bus-width", &bus_width) || bus_width != 4)
+					continue;
+
+				pdev_mmc = of_find_device_by_node(mmc_dt_node);
+				if (!pdev_mmc)
+					continue;
+
+				mmc_host = platform_get_drvdata(pdev_mmc);
+				if (!mmc_host)
+					continue;
+
+				adapter->mmc = mmc_host;
+				found = true;
+				DHD_ERROR(("%s: Matched MMC host %p (DT node: %pOF)\n", __FUNCTION__, mmc_host, mmc_dt_node));
+				break;
+			}
+
+			/* Ensure any reference held by the iterator is released */
+			if (mmc_dt_node)
+				of_node_put(mmc_dt_node);
+		}
+		#endif /* BCMSDIO && BCMDHD_DTS */
+	}
+
+	if (!adapter->mmc) {
+		DHD_ERROR(("%s: adapter->mmc still NULL after DT matching, cannot perform card detection\n", __FUNCTION__));
 	}
 
 	/* Extract sdhci_host from mmc_host */
-	sdio_host = (struct sdhci_host *)adapter->mmc->private_data;
+	sdio_host = (struct sdhci_host *)mmc_priv(adapter->mmc);
 	if (!sdio_host) {
 		DHD_ERROR(("%s: sdhci_host is NULL\n", __FUNCTION__));
 		return -ENODEV;
 	}
 
-	/* Perform actual SDIO card detection via sdhci */
+	/* Perform actual SDIO card detection via mmc core */
 	if (present) {
-		DHD_INFO(("======== Card detection to detect SDIO card! ========\n"));
-		err = sdhci_force_presence_change(sdio_host, 1);
+		DHD_ERROR(("======== Card detection to detect SDIO card! ========\n"));
+		mmc_detect_change(adapter->mmc, 0);
+		err = 0;
 	} else {
-		DHD_INFO(("======== Card detection to remove SDIO card! ========\n"));
-		err = sdhci_force_presence_change(sdio_host, 0);
+		DHD_ERROR(("======== Card detection to remove SDIO card! ========\n"));
+		mmc_detect_change(adapter->mmc, 0);
+		err = 0;
 	}
 
-	DHD_INFO(("%s: carddetect present=%d, result=%d\n", __FUNCTION__, present, err));
+	DHD_ERROR(("%s: carddetect present=%d, result=%d\n", __FUNCTION__, present, err));
 	return err;
 }
 #else /* !BCMSDIO */
@@ -443,7 +520,6 @@ int wifi_platform_bus_enumerate(wifi_adapter_info_t *adapter, bool device_presen
 		err = plat_data->set_carddetect(device_present, adapter);
 	}
 	return err;
-
 }
 
 int wifi_platform_get_mac_addr(wifi_adapter_info_t *adapter, unsigned char *buf,
@@ -537,64 +613,10 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 	/* Initialize adapter->mmc to NULL */
 	adapter->mmc = NULL;
 	
-	/* MMC/SDIO controller auto-matching for RK3588 WiFi (SDIO mode + DT enabled) */
-#if defined(BCMSDIO) && defined(BCMDHD_DTS)
-	{
-		struct device_node *mmc_dt_node = NULL;
-		unsigned int bus_width = 0;
-		bool found = false;
-		
-		DHD_INFO(("%s: Starting MMC/SDIO controller auto-matching\n", __FUNCTION__));
-		
-		/* Search for MMC controller node with RK3588 WiFi SDIO characteristics in device tree */
-		for_each_compatible_node(mmc_dt_node, NULL, "rockchip,rk3588-dw-mshc") {
-			struct platform_device *pdev_mmc = NULL;
-			struct mmc_host *mmc_host = NULL;
-			
-			if (!mmc_dt_node) {
-				continue;
-			}
-			
-			/* Check for RK3588 WiFi SDIO controller characteristics:
-			 * 1. cap-sdio-irq (mandatory)
-			 * 2. no-sd (mandatory)
-			 * 3. no-mmc (mandatory)
-			 * 4. bus-width = 4 (mandatory)
-			 */
-			if (!of_property_read_bool(mmc_dt_node, "cap-sdio-irq")) {
-				continue;
-			}
-			if (!of_property_read_bool(mmc_dt_node, "no-sd")) {
-				continue;
-			}
-			if (!of_property_read_bool(mmc_dt_node, "no-mmc")) {
-				continue;
-			}
-			if (of_property_read_u32(mmc_dt_node, "bus-width", &bus_width) || bus_width != 4) {
-				continue;
-			}
-			
-			/* Get platform device and mmc_host from matched DT node */
-			pdev_mmc = of_find_device_by_node(mmc_dt_node);
-			if (pdev_mmc) {
-				mmc_host = platform_get_drvdata(pdev_mmc);
-				if (mmc_host) {
-					/* All characteristics matched - this is the WiFi SDIO controller */
-					adapter->mmc = mmc_host;
-					found = true;
-					DHD_INFO(("%s: Matched MMC host %p (DT node: %pOF)\n", 
-						__FUNCTION__, mmc_host, mmc_dt_node));
-					of_node_put(mmc_dt_node);
-					break;
-				}
-			}
-		}
-		
-		if (!found) {
-			DHD_ERROR(("%s: Failed to match WiFi SDIO controller\n", __FUNCTION__));
-		}
-	}
-#endif /* BCMSDIO && BCMDHD_DTS */
+	/* MMC/SDIO controller auto-matching removed from probe: matching is performed lazily
+	 * in dhd_wlan_set_carddetect() when adapter->mmc is not available at probe time.
+	 */
+	/* NOTE: Original auto-matching logic moved to dhd_wlan_set_carddetect */
 	
 	wifi_plat_dev_probe_ret = dhd_wlan_init_plat_data(adapter);
 	if (!wifi_plat_dev_probe_ret)

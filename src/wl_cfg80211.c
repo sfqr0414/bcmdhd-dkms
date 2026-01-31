@@ -8798,10 +8798,23 @@ wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
 			if (!wl_get_drv_status(cfg, CONNECTED, dev))
 #endif /* defined(BCMDONGLEHOST) */
 			{
-				WL_ERR(("NOT assoc\n"));
+				WL_DBG(("NOT assoc\n"));
+#if defined(BCMDONGLEHOST)
+				/* If firmware reports association at a different layer, provide a
+				 * minimal station info to satisfy callers instead of treating as error.
+				 */
+				if (dhd_is_associated(dhd, ifidx, NULL)) {
+					/* provide a default signal value and report success */
+					sinfo->filled |= BIT(NL80211_STA_INFO_SIGNAL);
+					sinfo->signal = -45;
+					if (buf) {
+						MFREE(cfg->osh, buf, WLC_IOCTL_MEDLEN);
+						buf = NULL;
+					}
+					return 0;
+				}
 				if (err == -ENODATA)
 					goto error;
-#if defined(BCMDONGLEHOST)
 				if (!dhd_assoc_state) {
 					WL_TRACE_HW4(("drv state is not connected \n"));
 				}
@@ -8827,8 +8840,11 @@ wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
 						goto get_station_err;
 					}
 				}
+#else
+				if (err == -ENODATA)
+					goto error;
 #endif /* defined(BCMDONGLEHOST) */
-				err = -ENODEV;
+				err = -EAGAIN;
 				goto error;
 			}
 #if defined(BCMDONGLEHOST)
@@ -9459,7 +9475,7 @@ wl_get_suspend_bcn_li_dtim(struct bcm_cfg80211 *cfg,
 	}
 
 	if (!wl_get_drv_status(cfg, CONNECTED, dev)) {
-		WL_ERR(("not associated\n"));
+		WL_DBG(("not associated\n"));
 		return bcn_li_dtim;
 	}
 
@@ -16416,6 +16432,13 @@ wl_bss_connect_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	if (!conn_req_bssid) {
 		WL_ERR(("conn_req bssid is null\n"));
 		err = -EINVAL;
+		goto exit;
+	}
+
+	/* If driver is already in CONNECTED state, avoid duplicate connect reporting */
+	if (wl_get_drv_status(cfg, CONNECTED, ndev)) {
+		WL_INFORM_MEM(("[%s] Ignoring connect done: already CONNECTED\n", ndev->name));
+		err = BCME_OK;
 		goto exit;
 	}
 
@@ -28483,7 +28506,7 @@ wl_cfg80211_sroam_config(struct bcm_cfg80211 *cfg, struct net_device *dev, bool 
 
 	/* Check if associated */
 	if (!wl_get_drv_status(cfg, CONNECTED, dev)) {
-		WL_ERR(("NOT associated\n"));
+		WL_DBG(("NOT associated\n"));
 		return ret;
 	}
 

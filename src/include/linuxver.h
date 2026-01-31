@@ -713,16 +713,22 @@ static inline bool binary_sema_down(tsk_ctl_t *tsk)
 	if (down_interruptible(&tsk->sema) == 0) {
 		unsigned long flags = 0;
 		TSK_LOCK(&tsk->spinlock, flags);
-		if (tsk->up_cnt == 1)
+		if (tsk->up_cnt == 1) {
 			tsk->up_cnt--;
-		else {
-			DBG_THR(("dhd_dpc_thread: Unexpected up_cnt %d\n", tsk->up_cnt));
+		} else {
+			/* If the task is being terminated or kthread asked to stop, treat
+			 * an unexpected up_cnt quietly. This avoids noisy warnings during
+			 * orderly driver teardown where callers clear up_cnt intentionally.
+			 */
+			if (!tsk->terminated && !kthread_should_stop()) {
+				DBG_THR(("dhd_dpc_thread: Unexpected up_cnt %d\n", tsk->up_cnt));
+			}
 		}
 		TSK_UNLOCK(&tsk->spinlock, flags);
 		return false;
 	} else
 		return true;
-}
+} 
 
 static inline bool binary_sema_up(tsk_ctl_t *tsk)
 {

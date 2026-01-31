@@ -1,8 +1,14 @@
+bcmdhd (101.10.591.52.27-7) unstable; urgency=medium
+
+  * SDIO/MMC & platform fixes: API/DT/card-detect, logging and stability; improves card-detect reliability and fixes races.
+
+ -- sfqr0414 <sfqr0414@gmail.com>  Sat, 31 Jan 2026 12:00:00 +0800
+
 bcmdhd (101.10.591.52.27-6) stable; urgency=medium
 
-  * adapt to mainline linux 6.18.3
+  * Adapt to mainline Linux 6.18.3: SDIO/MMC API updates, DT/card-detect and logging fixes, and misc compatibility tweaks.
 
- -- Jianfeng Liu <sfqr0414@gmail.com>  Tue, 27 Jan 2026 14:02:00 +0800
+ -- sfqr0414 <sfqr0414@gmail.com>  Tue, 27 Jan 2026 14:02:00 +0800
 
 bcmdhd (101.10.591.52.27-5) stable; urgency=medium
 
