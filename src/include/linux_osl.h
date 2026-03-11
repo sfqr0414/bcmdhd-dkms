@@ -26,6 +26,17 @@
 
 #include <typedefs.h>
 #include <linuxerrmap.h>
+#include <linux/version.h>
+/* Define OSL_IN_INTERRUPT() to abstract in_interrupt()/in_irq() differences
+ * across kernel versions. Kernels with LINUX_VERSION_CODE >= 4.0.0 use
+ * in_interrupt(), older kernels may expose in_irq(). */
+#if defined(LINUX_VERSION_CODE) && LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
+#include <linux/interrupt.h>
+#define OSL_IN_INTERRUPT() in_interrupt()
+#else
+#include <linux/irqflags.h>
+#define OSL_IN_INTERRUPT() in_irq()
+#endif
 
 #define DECLSPEC_ALIGN(x)	__attribute__ ((aligned(x)))
 
